@@ -1,0 +1,133 @@
+// Section/card/chart definitions driving the generic renderer in app.js.
+// Adding or removing a card later is a matter of editing this array only.
+
+const SECTIONS = [
+  { id: "regime", title: "Regime Dashboard", kind: "regime" },
+
+  {
+    id: "credit",
+    title: "Credit Spreads",
+    description:
+      "Option-adjusted spreads vs Treasuries. HY widening typically leads equity drawdowns by 1–3 months.",
+    cards: [
+      { label: "HY OAS", path: "credit_spreads.hy_oas", unit: "pp" },
+      { label: "IG OAS", path: "credit_spreads.ig_oas", unit: "pp" },
+      { label: "EM Corp OAS", path: "credit_spreads.em_corp_oas", unit: "pp" },
+    ],
+    chart: {
+      title: "Credit Spreads — 5Y",
+      series: [
+        { path: "credit_spreads.hy_oas", label: "HY OAS", color: "#dc2626" },
+        { path: "credit_spreads.ig_oas", label: "IG OAS", color: "#2563eb" },
+        { path: "credit_spreads.em_corp_oas", label: "EM Corp OAS", color: "#d97706" },
+      ],
+    },
+  },
+
+  {
+    id: "inflation",
+    title: "Inflation Expectations",
+    description:
+      "Market-implied inflation (breakevens), the 5Y TIPS real yield, and Core PCE — what the Fed actually targets.",
+    cards: [
+      { label: "5Y Breakeven", path: "inflation.breakeven_5y", unit: "%" },
+      { label: "10Y Breakeven", path: "inflation.breakeven_10y", unit: "%" },
+      { label: "5Y5Y Forward", path: "inflation.forward_5y5y", unit: "%" },
+      { label: "10Y Real Rate", path: "inflation.real_10y", unit: "%" },
+      { label: "5Y TIPS Yield", path: "inflation.tips_5y", unit: "%" },
+      { label: "Core PCE YoY", path: "inflation.core_pce_yoy", unit: "%" },
+    ],
+    chart: {
+      title: "Breakevens, 5Y TIPS Yield & 5Y5Y Forward",
+      series: [
+        { path: "inflation.breakeven_5y", label: "5Y BE", color: "#2563eb" },
+        { path: "inflation.breakeven_10y", label: "10Y BE", color: "#16a34a" },
+        { path: "inflation.forward_5y5y", label: "5Y5Y Fwd", color: "#d97706" },
+        { path: "inflation.tips_5y", label: "5Y TIPS", color: "#7c3aed" },
+      ],
+    },
+  },
+
+  {
+    id: "liquidity",
+    title: "Liquidity & Financial Conditions",
+    description:
+      "NFCI is the Chicago Fed's index of overall financial conditions. Above zero = tighter than average, below = looser.",
+    cards: [
+      { label: "NFCI", path: "liquidity.nfci", unit: "" },
+      { label: "Fed Balance Sheet", path: "liquidity.fed_assets", unit: "T$" },
+      { label: "Overnight RRP", path: "liquidity.rrp", unit: "T$" },
+      { label: "M2", path: "liquidity.m2", unit: "T$" },
+    ],
+    chart: {
+      title: "NFCI — 5Y",
+      series: [{ path: "liquidity.nfci", label: "NFCI", color: "#4f46e5" }],
+    },
+  },
+
+  { id: "yield_curve", title: "Yield Curve Shape", kind: "curve" },
+
+  {
+    id: "growth_labor",
+    title: "Growth & Labor Market",
+    cards: [
+      { label: "Real GDP Growth", path: "growth_labor.gdp_growth", unit: "%" },
+      { label: "CPI YoY", path: "growth_labor.cpi_yoy", unit: "%" },
+      { label: "Saving Rate", path: "growth_labor.saving_rate", unit: "%" },
+      { label: "Fed Funds", path: "growth_labor.fed_funds", unit: "%" },
+      { label: "Unemployment", path: "growth_labor.unemployment", unit: "%" },
+      { label: "Initial Claims", path: "growth_labor.initial_claims", unit: "K" },
+      { label: "Labor Force Part.", path: "growth_labor.participation", unit: "%" },
+    ],
+    chart: {
+      title: "Unemployment Rate (2Y)",
+      series: [{ path: "growth_labor.unemployment", label: "Unemployment", color: "#2563eb" }],
+    },
+    barChart: {
+      title: "Payrolls by Category (MoM Δ, thousands)",
+      path: "growth_labor.payrolls_by_category",
+    },
+  },
+
+  {
+    id: "cross_asset",
+    title: "Cross-Asset",
+    description:
+      "Cross-asset directional reads. Stocks↑ + USD↑ + Gold↓ = clean risk-on. Mixed signals = caution.",
+    cards: [
+      { label: "VIX", path: "cross_asset.vix", unit: "" },
+      { label: "Gold (USD/oz)", path: "cross_asset.gold", unit: "$" },
+      { label: "WTI (USD/bbl)", path: "cross_asset.wti", unit: "$" },
+      { label: "Broad Dollar Index", path: "cross_asset.dxy", unit: "" },
+      { label: "EUR/USD", path: "cross_asset.eurusd", unit: "" },
+      { label: "USD/JPY", path: "cross_asset.usdjpy", unit: "" },
+    ],
+  },
+
+  {
+    id: "momentum",
+    title: "Momentum Composite",
+    kind: "momentum",
+    description:
+      "Cross-sectional ETF momentum ranking, updated daily. Score 0–100 = 45% trend + 15% acceleration + 25% proximity to 52-week high + 15% low volatility, each percentile-ranked against the other ETFs below (a relative ranking, not a return forecast). Own methodology, inspired by the concept of commercial momentum-ranking tools but not a reproduction of any specific one's formula.",
+  },
+
+  {
+    id: "treasury",
+    title: "Treasury Spreads",
+    cards: [
+      { label: "2Y Treasury", path: "treasury_spreads.y2", unit: "%" },
+      { label: "3M Treasury", path: "treasury_spreads.m3", unit: "%" },
+      { label: "10Y Treasury", path: "treasury_spreads.y10", unit: "%" },
+      { label: "2Y-3M Spread", path: "treasury_spreads.spread_2y3m", unit: "pp" },
+      { label: "10Y-2Y Spread", path: "treasury_spreads.spread_10y2y", unit: "pp" },
+    ],
+    chart: {
+      title: "Treasury Yields: 10Y vs 2Y",
+      series: [
+        { path: "treasury_spreads.y10", label: "10Y Treasury", color: "#2563eb" },
+        { path: "treasury_spreads.y2", label: "2Y Treasury", color: "#d97706" },
+      ],
+    },
+  },
+];
