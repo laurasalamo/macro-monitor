@@ -26,12 +26,16 @@ def apply_level(series, scale=1.0):
 
 
 def apply_yoy(series):
-    """Year-over-year % change, matched 12 observations back (monthly series)."""
+    """Year-over-year % change vs. the same date one year earlier (monthly series).
+
+    Matched by date rather than 12 observations back, so a missing month (FRED
+    ".") doesn't shift the following year's values onto the wrong base month.
+    """
+    by_date = dict(series)
     out = []
-    for i in range(12, len(series)):
-        d, v = series[i]
-        _, v_prev = series[i - 12]
-        if v_prev == 0:
+    for d, v in series:
+        v_prev = by_date.get(f"{int(d[:4]) - 1}{d[4:]}")
+        if not v_prev:  # no base observation, or a zero base
             continue
         out.append((d, (v / v_prev - 1.0) * 100.0))
     return out

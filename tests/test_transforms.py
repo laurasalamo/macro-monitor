@@ -71,12 +71,6 @@ def test_apply_yoy_short_series_is_empty():
     assert tx.apply_yoy([]) == []
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="apply_yoy matches 12 *observations* back, not the same calendar month a year "
-    "earlier. parse_observations drops FRED '.' gaps, so one missing month shifts the "
-    "next ~12 YoY values onto the wrong base month (and drops one).",
-)
 def test_apply_yoy_with_missing_month_uses_same_calendar_month():
     # 2020: Jan..Dec = 100..111; 2021: Jan..Dec = 110..121 -> every true YoY is +10% of
     # the base month, i.e. (110+k)/(100+k)-1. Drop Jul 2020 as FRED '.' would.
@@ -84,10 +78,11 @@ def test_apply_yoy_with_missing_month_uses_same_calendar_month():
                                                             [110.0 + k for k in range(12)])]
     raw = [o for o in raw if o["date"] != "2020-07-01"]
     out = dict(tx.apply_yoy(tx.parse_observations(raw)))
-    # Feb 2021 should compare to Feb 2020 (111 / 101 - 1 = +9.90%); the current code
-    # compares it to Jan 2020 (111 / 100 - 1 = +11%). Months Jan-Jun 2021 are all
-    # shifted this way, and Jan 2021 gets no YoY value at all.
+    # Feb 2021 compares to Feb 2020 (111 / 101 - 1 = +9.90%), not to Jan 2020 as a
+    # "12 observations back" match would. Jan 2021 keeps its value; Jul 2021 has no base.
     assert out["2021-02-01"] == pytest.approx((111.0 / 101.0 - 1) * 100)
+    assert out["2021-01-01"] == pytest.approx(10.0)
+    assert "2021-07-01" not in out
 
 
 def test_apply_yoy_skips_zero_base():
