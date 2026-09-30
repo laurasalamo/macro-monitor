@@ -243,6 +243,28 @@ def build_regime_section(metrics):
     }
 
 
+def empty_sections(output):
+    """Names of top-level sections with no usable data at all (every metric None,
+    no rows, etc.). Individual missing series are fine; a fully blank panel is not."""
+    empty = []
+    for name, section in output.items():
+        if name == "generated_at_utc":
+            continue
+        if name == "momentum":
+            has_data = bool(section.get("rows"))
+        elif name == "yield_curve":
+            has_data = bool(section.get("current"))
+        elif name == "regime":
+            # current_label falls back to "Neutral" with no inputs, so check the cards
+            has_data = any(section.get("snapshot_cards", {}).values())
+        else:
+            # metric dicts are None on failure; payrolls_by_category is [] on failure
+            has_data = any(section.values())
+        if not has_data:
+            empty.append(name)
+    return empty
+
+
 def main():
     load_dotenv()
     api_key = os.environ.get("FRED_API_KEY")
@@ -352,6 +374,16 @@ def main():
         },
         "momentum": momentum_section,
     }
+
+    # Refuse to write a blank panel: exit nonzero before touching data/ so the
+    # workflow fails, skips the commit, and the previous good data stays live.
+    empty = empty_sections(output)
+    if empty:
+        for w in warnings:
+            print(f"  WARN: {w}", file=sys.stderr)
+        print(f"ERROR: section(s) came back empty: {', '.join(empty)}", file=sys.stderr)
+        print("Not writing data/data.json; previous data left in place.", file=sys.stderr)
+        sys.exit(1)
 
     os.makedirs(DATA_DIR, exist_ok=True)
     with open(os.path.join(DATA_DIR, "data.json"), "w") as f:
