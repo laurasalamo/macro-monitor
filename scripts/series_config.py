@@ -79,6 +79,18 @@ STALE_THRESHOLD_DAYS = {
     "quarterly": 210,
 }
 
+# Metrics whose history is written to data.json because js/config.js charts
+# them. Every other metric ships only latest/delta/as_of (history is still
+# fetched and used in-memory, e.g. for the regime calculation). Keep in sync
+# with the `chart.series` paths in js/config.js.
+CHART_HISTORY_KEYS = {
+    "hy_oas", "ig_oas", "em_corp_oas",
+    "breakeven_5y", "breakeven_10y", "forward_5y5y", "tips_5y",
+    "nfci",
+    "unemployment",
+    "y10", "y2",
+}
+
 # Years of history to keep per metric (default 5, override per key).
 HISTORY_YEARS = {
     "default": 5,

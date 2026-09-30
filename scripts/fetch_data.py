@@ -24,6 +24,7 @@ from gold_client import GoldFetchError, get_gold_series
 from momentum_client import MomentumFetchError, get_ohlcv_series
 from momentum_config import UNIVERSE as MOMENTUM_UNIVERSE
 from series_config import (
+    CHART_HISTORY_KEYS,
     FRED_SERIES,
     HISTORY_YEARS,
     SCALE,
@@ -177,6 +178,12 @@ def fetch_momentum(warnings):
     }
 
 
+def without_history(metric):
+    if not metric:
+        return metric
+    return {k: v for k, v in metric.items() if k != "history"}
+
+
 def build_regime_section(metrics):
     gdp_hist = (metrics.get("gdp_growth") or {}).get("history", [])
     curve_hist = (metrics.get("spread_10y2y") or {}).get("history", [])
@@ -282,6 +289,16 @@ def main():
 
     regime_section = build_regime_section(metrics)
 
+    # History is only needed in data.json for charted metrics; drop it
+    # everywhere else to keep the daily-committed file small.
+    regime_section["snapshot_cards"] = {
+        k: without_history(m) for k, m in regime_section["snapshot_cards"].items()
+    }
+    metrics = {
+        k: m if k in CHART_HISTORY_KEYS else without_history(m)
+        for k, m in metrics.items()
+    }
+
     output = {
         "generated_at_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "regime": regime_section,
@@ -338,7 +355,7 @@ def main():
 
     os.makedirs(DATA_DIR, exist_ok=True)
     with open(os.path.join(DATA_DIR, "data.json"), "w") as f:
-        json.dump(output, f, indent=2)
+        json.dump(output, f, separators=(",", ":"))
 
     with open(os.path.join(DATA_DIR, "meta.json"), "w") as f:
         json.dump({"generated_at_utc": output["generated_at_utc"], "warnings": warnings}, f, indent=2)
