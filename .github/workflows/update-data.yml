@@ -19,7 +19,10 @@ jobs:
           python-version: "3.12"
 
       - name: Install dependencies
-        run: pip install -r scripts/requirements.txt
+        run: pip install -r scripts/requirements.txt -r scripts/requirements-dev.txt
+
+      - name: Run tests
+        run: python -m pytest -q
 
       - name: Fetch macro data
         env:
