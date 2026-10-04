@@ -364,7 +364,10 @@ function setupChartControls(el, section, data) {
       toInput.value = to || "";
     }
     const visible = chart.series.filter((_, i) => shown.has(i));
-    renderLineChart(canvasId, visible, data, from, to, Boolean(chart.toggles || chart.switchable));
+    renderLineChart(canvasId, visible, data, {
+      from, to, unit: chart.unit, bars: chart.bars, timeUnit: chart.timeUnit,
+      hideLegend: Boolean(chart.toggles || chart.switchable || chart.series.length === 1),
+    });
   }
 
   function applyRange(range) {
@@ -431,6 +434,105 @@ function setupChartControls(el, section, data) {
   }
 }
 
+// ---------------------------------------------------------------- macro sections
+
+function fmtShortDate(isoDate) {
+  const [, m, d] = isoDate.split("-").map(Number);
+  return `${MONTHS[m - 1]} ${d}`;
+}
+
+// Big value with a small unit, the change since the previous release, and the
+// age of the data (or its date, for weekly releases) in the corner.
+function macroCardHTML(card, data) {
+  const m = getPath(data, card.path);
+  if (!m || m.latest === null || m.latest === undefined) {
+    return `<div class="card macro-card"><div class="card-label">${card.label}</div><div class="card-value">—</div></div>`;
+  }
+  const snapshot = card.stateKey && data.regime && (data.regime.snapshot_cards || {})[card.stateKey];
+  const state = snapshot && snapshot.state ? ` value-${snapshot.state}` : "";
+  const sign = card.signed && m.latest > 0 ? "+" : "";
+  const age = card.showDate ? fmtShortDate(m.as_of) : `${m.days_since}d`;
+  const ageTitle = `Latest data: ${fmtPeriod(m.as_of, "day")}${m.stale ? " (stale)" : ""}`;
+  let delta = "";
+  if (m.delta !== null && m.delta !== undefined) {
+    const arrow = m.delta > 0 ? "↑" : m.delta < 0 ? "↓" : "→";
+    const deltaUnit = card.unit === "%" ? "pp" : card.unit;
+    delta = `<div class="macro-delta">${arrow}${m.delta > 0 ? "+" : ""}${Math.abs(m.delta).toFixed(2)}${deltaUnit}</div>`;
+  }
+  return `
+    <div class="card macro-card">
+      <div class="macro-card-head">
+        <span class="card-label">${card.label}</span>
+        <span class="age-badge${m.stale ? " stale" : ""}" title="${ageTitle}">${age}</span>
+      </div>
+      <div class="card-value${state}">${sign}${m.latest.toFixed(card.decimals)}<span class="card-unit">${card.unit}</span></div>
+      ${delta}
+    </div>`;
+}
+
+// One row per value: each card's latest reading, then every chart's points.
+function macroSectionCSV(section, data) {
+  const rows = [["Series", "Date", "Value", "Unit"]];
+  for (const card of section.cards) {
+    const m = getPath(data, card.path);
+    if (m && m.latest !== null) rows.push([card.label, m.as_of, m.latest, card.unit]);
+  }
+  for (const chart of section.charts) {
+    if (chart.categoryPath) {
+      const asOf = (getPath(data, chart.datePath) || {}).as_of || "";
+      for (const item of getPath(data, chart.categoryPath) || []) rows.push([`${chart.title}: ${item.label}`, asOf, item.value, "K"]);
+      continue;
+    }
+    for (const s of chart.series) {
+      for (const [d, v] of (getPath(data, s.path) || {}).history || []) rows.push([chart.title, d, v, chart.unit]);
+    }
+  }
+  const cell = (v) => (/[",\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : v);
+  return rows.map((r) => r.map(cell).join(",")).join("\n") + "\n";
+}
+
+function downloadCSV(filename, text) {
+  const url = URL.createObjectURL(new Blob([text], { type: "text/csv" }));
+  const a = Object.assign(document.createElement("a"), { href: url, download: filename });
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function renderMacroSection(el, section, data) {
+  const asOf = getPath(data, section.asOfPath);
+  const badge = asOf && asOf.as_of
+    ? `<span class="month-badge">${fmtShortDate(asOf.as_of)} (${asOf.days_since}d ago)</span>` : "";
+  // Each chart gets a pseudo-section id so the shared chart controls can wire it up.
+  const charts = section.charts.map((chart, i) => ({ id: `${section.id}-${i}`, chart }));
+  el.innerHTML = `
+    <div class="section-head">
+      <h2>${section.title}</h2>${badge}
+      <button type="button" class="export-csv">Export CSV</button>
+    </div>
+    <div class="card-grid" style="--card-cols:${section.cards.length}">${section.cards.map((c) => macroCardHTML(c, data)).join("")}</div>
+    <div class="chart-pair">
+      ${charts.map(({ id, chart }) => `
+        <div class="chart-panel" id="panel-${id}">
+          <h3 class="chart-title">${chart.title}</h3>
+          ${chart.subtitle ? `<p class="chart-sub">${chart.subtitle}</p>` : ""}
+          ${chart.series ? chartControlsHTML({ id, chart }) : ""}
+          <div class="chart-box"><canvas id="chart-${id}"></canvas></div>
+        </div>`).join("")}
+    </div>`;
+
+  el.querySelector(".export-csv").addEventListener("click", () =>
+    downloadCSV(`${section.id}-${data.generated_at_utc.slice(0, 10)}.csv`, macroSectionCSV(section, data)));
+
+  requestAnimationFrame(() => {
+    for (const pseudo of charts) {
+      if (pseudo.chart.categoryPath) renderBarChart(`chart-${pseudo.id}`, getPath(data, pseudo.chart.categoryPath));
+      else setupChartControls(el.querySelector(`#panel-${pseudo.id}`), pseudo, data);
+    }
+  });
+}
+
 function renderSection(section, data) {
   const el = document.createElement("section");
   el.id = section.id;
@@ -450,6 +552,11 @@ function renderSection(section, data) {
     el.innerHTML = `<div class="history-head"><h2>${section.title}</h2>${badge}</div>
       <div class="chart-box"><canvas id="chart-${section.id}"></canvas></div>`;
     requestAnimationFrame(() => renderYieldCurveChart(`chart-${section.id}`, data.yield_curve));
+    return el;
+  }
+
+  if (section.kind === "macro") {
+    renderMacroSection(el, section, data);
     return el;
   }
 
@@ -479,7 +586,7 @@ function renderSection(section, data) {
   if (section.chart && (section.chart.ranges || section.chart.toggles || section.chart.switchable)) {
     requestAnimationFrame(() => setupChartControls(el, section, data));
   } else if (section.chart) {
-    requestAnimationFrame(() => renderLineChart(`chart-${section.id}`, section.chart.series, data));
+    requestAnimationFrame(() => renderLineChart(`chart-${section.id}`, section.chart.series, data, { unit: section.chart.unit }));
   }
   if (section.barChart) {
     requestAnimationFrame(() => renderBarChart(`bar-${section.id}`, getPath(data, section.barChart.path)));

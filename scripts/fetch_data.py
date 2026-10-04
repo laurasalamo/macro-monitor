@@ -120,6 +120,34 @@ def fetch_yield_curve(api_key, warnings):
     return current, one_year_ago, max(dates, default=None)
 
 
+def series_metric(series, frequency, unit):
+    """A metric dict (same shape as build_metric's) for a series computed here."""
+    if not series:
+        return None
+    latest, delta, as_of = tx.latest_and_delta(series)
+    days_since, stale = tx.staleness(as_of, frequency, STALE_THRESHOLD_DAYS)
+    return {
+        "latest": round(latest, 4),
+        "delta": round(delta, 4) if delta is not None else None,
+        "as_of": as_of,
+        "stale": stale,
+        "days_since": days_since,
+        "unit": unit,
+        "history": [[d, round(v, 4)] for d, v in series],
+    }
+
+
+def build_consumption_metrics(metrics):
+    """GDP growth and real PCE scaled by 1 / (1 - saving rate): growth and
+    spending as if households spent all their income. GDP is quarterly, so it
+    uses each quarter's average saving rate."""
+    hist = lambda k: [tuple(p) for p in (metrics.get(k) or {}).get("history", [])]
+    saving = hist("saving_rate")
+    adj_growth = tx.divide_by_saving_complement(hist("gdp_growth"), tx.quarterly_mean(saving))
+    backed = tx.divide_by_saving_complement(hist("real_pce"), saving)
+    return series_metric(adj_growth, "quarterly", "%"), series_metric(backed, "monthly", "T")
+
+
 def fetch_spread_2y3m(api_key, warnings):
     try:
         s2 = tx.apply_level(tx.parse_observations(get_series("DGS2", api_key)))
@@ -244,8 +272,6 @@ def build_regime_history(metrics, recessions):
     series = {}
     for k in keys:
         hist = (metrics.get(k) or {}).get("history", [])
-        if k == "initial_claims":
-            hist = [(d, v / 1000) for d, v in hist]  # raw claims -> thousands
         series[k] = [[d, round(v, 3)] for d, v in tx.thin_to_weekly_before(hist, cutoff)]
     return {"recessions": recessions, "series": series}
 
@@ -319,6 +345,8 @@ def main():
     print("Fetching NBER recession dates (USREC)...")
     recessions = fetch_recessions(api_key, warnings)
 
+    metrics["adj_growth"], metrics["consumption_backed"] = build_consumption_metrics(metrics)
+
     regime_section = build_regime_section(metrics)
     regime_history = build_regime_history(metrics, recessions)
 
@@ -362,7 +390,10 @@ def main():
             "cpi_yoy": metrics.get("cpi_yoy"),
             "saving_rate": metrics.get("saving_rate"),
             "fed_funds": metrics.get("fed_funds"),
+            "adj_growth": metrics.get("adj_growth"),
+            "consumption_backed": metrics.get("consumption_backed"),
             "unemployment": metrics.get("unemployment"),
+            "payrolls_mom": metrics.get("payrolls_mom"),
             "payrolls_by_category": payrolls_by_category,
             "initial_claims": metrics.get("initial_claims"),
             "participation": metrics.get("participation"),

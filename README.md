@@ -8,7 +8,7 @@ refreshed automatically once a day via GitHub Actions.
 
 Regime Dashboard (7 indicators rated bullish / neutral / bearish, thresholds in
 `scripts/regime_logic.py`; click a card for its full FRED history), Credit Spreads, Inflation Expectations (5Y & 10Y nominal, breakeven and TIPS yields, plus Core PCE), Liquidity &
-Financial Conditions, Yield Curve Shape, Growth & Labor Market, Cross-Asset, Treasury Spreads,
+Financial Conditions, Yield Curve Shape, Growth & Inflation (incl. GDP and real consumption adjusted by the saving rate), Labor Market, Cross-Asset, Treasury Spreads,
 Momentum Composite (ETF ranking).
 
 ## One-time setup

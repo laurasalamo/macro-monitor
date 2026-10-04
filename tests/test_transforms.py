@@ -273,3 +273,19 @@ def test_recession_ranges():
 def test_recession_ranges_none():
     assert tx.recession_ranges(monthly([0, 0])) == []
     assert tx.recession_ranges([]) == []
+
+
+# ---------------------------------------------------------------- saving-rate adjustment
+
+def test_quarterly_mean_keys_by_quarter_start_and_skips_partial_quarters():
+    series = monthly([1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0])  # Jan-Jul 2020
+    assert tx.quarterly_mean(series) == [("2020-01-01", 2.0), ("2020-04-01", 5.0)]
+
+
+def test_divide_by_saving_complement_aligns_by_date():
+    series = [("2020-01-01", 2.0), ("2020-02-01", 9.0), ("2020-03-01", 1.0)]
+    saving = [("2020-01-01", 20.0), ("2020-03-01", 50.0)]
+    assert tx.divide_by_saving_complement(series, saving) == [
+        ("2020-01-01", pytest.approx(2.5)),
+        ("2020-03-01", pytest.approx(2.0)),
+    ]

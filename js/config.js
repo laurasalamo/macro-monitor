@@ -117,28 +117,68 @@ const SECTIONS = [
 
   { id: "yield_curve", title: "Yield Curve Shape", kind: "curve" },
 
+  // kind "macro": cards with a data-age badge, then two charts side by side.
+  // `stateKey` colors a card's value by its Regime Dashboard rating; `asOfPath`
+  // is the release dated in the section header.
   {
-    id: "growth_labor",
-    title: "Growth & Labor Market",
+    id: "growth_inflation",
+    title: "Growth & Inflation",
+    kind: "macro",
+    asOfPath: "growth_labor.cpi_yoy",
     cards: [
-      { label: "Real GDP Growth", path: "growth_labor.gdp_growth", unit: "%" },
-      { label: "CPI YoY", path: "growth_labor.cpi_yoy", unit: "%" },
-      { label: "Saving Rate", path: "growth_labor.saving_rate", unit: "%" },
-      { label: "Fed Funds", path: "growth_labor.fed_funds", unit: "%" },
-      { label: "Unemployment", path: "growth_labor.unemployment", unit: "%" },
-      { label: "Initial Claims", path: "growth_labor.initial_claims", unit: "K" },
-      { label: "Labor Force Part.", path: "growth_labor.participation", unit: "%" },
+      { label: "Real GDP Growth", path: "growth_labor.gdp_growth", unit: "%", decimals: 1, stateKey: "gdp_growth" },
+      { label: "CPI YoY", path: "growth_labor.cpi_yoy", unit: "%", decimals: 1, stateKey: "cpi_yoy" },
+      { label: "Saving Rate", path: "growth_labor.saving_rate", unit: "%", decimals: 1 },
+      { label: "Fed Funds", path: "growth_labor.fed_funds", unit: "%", decimals: 2 },
     ],
-    chart: {
-      title: "Unemployment Rate",
-      ranges: STANDARD_RANGES,
-      defaultRange: "2Y",
-      series: [{ path: "growth_labor.unemployment", label: "Unemployment", color: "#2563eb" }],
-    },
-    barChart: {
-      title: "Payrolls by Category (MoM Δ, thousands)",
-      path: "growth_labor.payrolls_by_category",
-    },
+    charts: [
+      {
+        title: "Consumption-Adjusted Growth",
+        subtitle: "Real GDP growth / (1 − Saving Rate)",
+        bars: true,
+        unit: "%",
+        timeUnit: "quarter",
+        ranges: STANDARD_RANGES,
+        defaultRange: "1Y",
+        series: [{ path: "growth_labor.adj_growth", label: "Adjusted growth" }],
+      },
+      {
+        title: "Consumption Backed by Income",
+        subtitle: "Real PCE / (1 − Saving Rate), trillions of chained 2017 $",
+        unit: "T",
+        timeUnit: "quarter",
+        ranges: STANDARD_RANGES,
+        defaultRange: "1Y",
+        series: [{ path: "growth_labor.consumption_backed", label: "Consumption backed by income", color: "#3b82f6" }],
+      },
+    ],
+  },
+
+  {
+    id: "labor",
+    title: "Labor Market",
+    kind: "macro",
+    asOfPath: "growth_labor.initial_claims",
+    cards: [
+      { label: "Unemployment", path: "growth_labor.unemployment", unit: "%", decimals: 1, stateKey: "unemployment" },
+      { label: "Payrolls (monthly)", path: "growth_labor.payrolls_mom", unit: "K", decimals: 0, signed: true, stateKey: "payrolls_mom" },
+      { label: "Jobless Claims", path: "growth_labor.initial_claims", unit: "K", decimals: 0, showDate: true },
+      { label: "Participation Rate", path: "growth_labor.participation", unit: "%", decimals: 1 },
+    ],
+    charts: [
+      {
+        title: "Unemployment Rate",
+        unit: "%",
+        ranges: STANDARD_RANGES,
+        defaultRange: "2Y",
+        series: [{ path: "growth_labor.unemployment", label: "Unemployment", color: "#3b82f6" }],
+      },
+      {
+        title: "Payrolls by Category (MoM Δ, thousands)",
+        categoryPath: "growth_labor.payrolls_by_category",
+        datePath: "growth_labor.payrolls_mom",
+      },
+    ],
   },
 
   {

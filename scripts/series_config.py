@@ -22,6 +22,7 @@ FRED_SERIES = {
     "payrolls_service": ("SRVPRD",          "mom_change", "K",  "monthly"),
     "payrolls_govt":    ("USGOVT",          "mom_change", "K",  "monthly"),
     "saving_rate":      ("PSAVERT",         "level",      "%",  "monthly"),
+    "real_pce":         ("PCEC96",          "level",      "T",  "monthly"),
     "fed_funds":        ("DFF",             "level",      "%",  "daily"),
     "initial_claims":   ("ICSA",            "level",      "K",  "weekly"),
     "claims_4wk":       ("IC4WSA",          "level",      "K",  "weekly"),
@@ -62,6 +63,8 @@ SCALE = {
     "m2": 1e-3,          # billions of $ -> trillions of $
     "rrp": 1e-3,         # billions of $ -> trillions of $
     "claims_4wk": 1e-3,  # claims -> thousands of claims
+    "initial_claims": 1e-3,
+    "real_pce": 1e-3,    # billions of chained 2017 $ -> trillions
 }
 
 # Tenor points for the yield-curve-shape snapshot (current vs. 1 year ago).
@@ -91,7 +94,7 @@ CHART_HISTORY_KEYS = {
     "hy_oas", "ig_oas", "em_corp_oas",
     "breakeven_5y", "breakeven_10y", "forward_5y5y", "real_10y", "tips_5y", "core_pce_yoy",
     "nfci", "fed_assets", "rrp", "m2",
-    "unemployment",
+    "unemployment", "adj_growth", "consumption_backed",
     "y10", "y5", "y2",
 }
 

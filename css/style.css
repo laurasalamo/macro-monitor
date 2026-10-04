@@ -222,6 +222,90 @@ main {
   color: var(--text-muted);
 }
 
+/* ---------- Macro sections (Growth & Inflation, Labor Market) ---------- */
+
+.section-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.section-head h2 { margin: 0; }
+
+.export-csv {
+  margin-left: auto;
+  font: inherit;
+  font-size: 0.8rem;
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--card-bg);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.export-csv:hover { color: var(--blue); border-color: var(--blue); }
+
+.macro-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.age-badge {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 1px 6px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.age-badge.stale { background: #fef3c7; color: #92400e; border-color: #fde68a; }
+
+.macro-card .card-value { font-size: 1.75rem; font-variant-numeric: tabular-nums; }
+
+.card-unit {
+  font-size: 0.95rem;
+  font-weight: 500;
+  margin-left: 2px;
+  color: var(--text-muted);
+}
+
+.value-bullish { color: var(--green); }
+.value-neutral { color: var(--amber); }
+.value-bearish { color: var(--red); }
+
+.macro-delta {
+  margin-top: 4px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.chart-pair {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px 28px;
+}
+
+.chart-panel { min-width: 0; }
+
+.chart-panel .chart-title { margin: 4px 0 0; color: var(--text); }
+
+.chart-sub {
+  margin: 2px 0 0;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.chart-panel .chart-box { height: 260px; }
+
 .error {
   color: var(--red);
 }

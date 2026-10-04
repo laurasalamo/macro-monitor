@@ -3,50 +3,63 @@
 
 const CHART_COLORS = ["#2563eb", "#dc2626", "#d97706", "#16a34a", "#7c3aed", "#0891b2"];
 
-// `from`/`to` (ISO dates, optional) limit the chart to a window; only points
-// inside it are plotted so the y-axis fits the visible range. `hideLegend` is
-// for charts whose toggle chips already act as the legend. Re-rendering the
-// same canvas replaces its chart.
-function renderLineChart(canvasId, seriesDefs, data, from, to, hideLegend) {
+const UP_COLOR = "#16a34a";
+const DOWN_COLOR = "#dc2626";
+
+// Options (all optional): `from`/`to` (ISO dates) limit the chart to a window;
+// only points inside it are plotted so the y-axis fits the visible range.
+// `hideLegend` is for charts whose toggle chips or title already name the
+// lines. `unit` suffixes the y-axis and tooltip values. `bars` draws bars,
+// green above zero and red below. `timeUnit: "quarter"` labels ticks Q2'26 on windows up to 3 years.
+// Re-rendering the same canvas replaces its chart.
+function renderLineChart(canvasId, seriesDefs, data, opts = {}) {
+  const { from, to, hideLegend, unit = "", bars, timeUnit } = opts;
   const canvas = document.getElementById(canvasId);
   if (!canvas) return;
   const existing = Chart.getChart(canvas);
   if (existing) existing.destroy();
   const inWindow = ([d]) => (!from || d >= from) && (!to || d <= to);
+  const num = (v) => v.toLocaleString(undefined, { maximumFractionDigits: 2 });
 
   const datasets = seriesDefs.map((s, i) => {
     const m = getPath(data, s.path);
-    const hist = (m && m.history) || [];
-    return {
-      label: s.label,
-      data: hist.filter(inWindow).map(([d, v]) => ({ x: d, y: v })),
-      borderColor: s.color || CHART_COLORS[i % CHART_COLORS.length],
-      backgroundColor: "transparent",
-      borderWidth: 1.5,
-      pointRadius: 0,
-      tension: 0.15,
-    };
+    const points = ((m && m.history) || []).filter(inWindow).map(([d, v]) => ({ x: d, y: v }));
+    const color = s.color || CHART_COLORS[i % CHART_COLORS.length];
+    return bars
+      ? { label: s.label, data: points, backgroundColor: points.map((p) => (p.y < 0 ? DOWN_COLOR : UP_COLOR)), borderRadius: 3 }
+      : { label: s.label, data: points, borderColor: color, backgroundColor: "transparent", borderWidth: 1.5, pointRadius: 0, tension: 0.15 };
   });
 
+  // Quarter labels only on short windows; longer ones get automatic (year) ticks.
+  const shortWindow = from && to && localDate(to) - localDate(from) <= 3 * 365.25 * 864e5;
+  const time = timeUnit === "quarter" && shortWindow
+    ? { unit: "quarter", displayFormats: { quarter: "QQQ''yy" }, tooltipFormat: "QQQ yyyy" }
+    : from || to ? {} : { unit: "month" };
+  // Bars sit between ticks, so pad the window by half a period on each side.
+  const x = { type: "time", time, offset: Boolean(bars), ticks: { maxRotation: 0, autoSkipPadding: 16 } };
+  if (from && !bars) x.min = localDate(from).getTime();
+  if (to && !bars) x.max = localDate(to).getTime();
+
   new Chart(canvas.getContext("2d"), {
-    type: "line",
+    type: bars ? "bar" : "line",
     data: { datasets },
     options: {
       responsive: true,
       maintainAspectRatio: false,
       scales: {
-        x: from || to
-          ? { type: "time", min: from ? localDate(from).getTime() : undefined, max: to ? localDate(to).getTime() : undefined,
-              ticks: { maxRotation: 0, autoSkipPadding: 16 } }
-          : { type: "time", time: { unit: "month" }, ticks: { maxRotation: 0 } },
-        y: { beginAtZero: false },
+        x,
+        y: { beginAtZero: Boolean(bars), ticks: { callback: (v) => `${num(v)}${unit}` } },
       },
-      plugins: { legend: { display: !hideLegend, position: "bottom" } },
+      plugins: {
+        legend: { display: !hideLegend, position: "bottom" },
+        tooltip: { callbacks: { label: (c) => `${c.dataset.label}: ${num(c.parsed.y)}${unit}` } },
+      },
       interaction: { mode: "nearest", intersect: false },
     },
   });
 }
 
+// Horizontal bars for a list of {label, value}, green for gains and red for losses.
 function renderBarChart(canvasId, items) {
   const canvas = document.getElementById(canvasId);
   if (!canvas || !items || !items.length) return;
@@ -59,7 +72,8 @@ function renderBarChart(canvasId, items) {
         {
           label: "MoM Δ (thousands)",
           data: items.map((i) => i.value),
-          backgroundColor: "#16a34a",
+          backgroundColor: items.map((i) => (i.value < 0 ? DOWN_COLOR : UP_COLOR)),
+          borderRadius: 3,
         },
       ],
     },

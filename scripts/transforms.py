@@ -61,6 +61,22 @@ def diff_series(series_a, series_b):
     return out
 
 
+def quarterly_mean(series):
+    """Average of a monthly series per calendar quarter, keyed by the quarter's
+    first day (the date FRED gives quarterly series). Partial quarters are skipped."""
+    by_quarter = {}
+    for d, v in series:
+        q_month = (int(d[5:7]) - 1) // 3 * 3 + 1
+        by_quarter.setdefault(f"{d[:4]}-{q_month:02d}-01", []).append(v)
+    return [(q, sum(vs) / len(vs)) for q, vs in sorted(by_quarter.items()) if len(vs) == 3]
+
+
+def divide_by_saving_complement(series, saving_rate):
+    """value / (1 - saving rate %), aligned by exact date (inner join)."""
+    rates = dict(saving_rate)
+    return [(d, v / (1 - rates[d] / 100)) for d, v in series if d in rates and rates[d] < 100]
+
+
 def latest_and_delta(series):
     """Return (latest_value, delta_vs_prior_observation, as_of_date)."""
     if not series:
