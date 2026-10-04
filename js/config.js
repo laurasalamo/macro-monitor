@@ -94,7 +94,7 @@ const SECTIONS = [
     id: "liquidity",
     title: "Liquidity & Financial Conditions",
     description:
-      "NFCI is the Chicago Fed's index of overall financial conditions. Above zero = tighter than average, below = looser.",
+      "NFCI is the Chicago Fed's index of overall financial conditions. Above zero = tighter than average, below = looser. Click a card to chart it.",
     cards: [
       { label: "NFCI", path: "liquidity.nfci", unit: "" },
       { label: "Fed Balance Sheet", path: "liquidity.fed_assets", unit: "T$" },
@@ -102,10 +102,16 @@ const SECTIONS = [
       { label: "M2", path: "liquidity.m2", unit: "T$" },
     ],
     chart: {
-      title: "NFCI",
+      // Click a card to chart it; one series at a time since units differ.
+      switchable: true,
       ranges: STANDARD_RANGES,
       defaultRange: "5Y",
-      series: [{ path: "liquidity.nfci", label: "NFCI", color: "#4f46e5" }],
+      series: [
+        { path: "liquidity.nfci", label: "NFCI", title: "NFCI (Chicago Fed National Financial Conditions Index)", color: "#4f46e5" },
+        { path: "liquidity.fed_assets", label: "Fed Balance Sheet", title: "Fed Balance Sheet — total assets (T$)", color: "#16a34a" },
+        { path: "liquidity.rrp", label: "Overnight RRP", title: "Overnight Reverse Repo usage (T$)", color: "#d97706" },
+        { path: "liquidity.m2", label: "M2", title: "M2 Money Supply (T$)", color: "#0891b2" },
+      ],
     },
   },
 

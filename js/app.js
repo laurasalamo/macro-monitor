@@ -17,10 +17,15 @@ function deltaClass(delta) {
   return delta > 0 ? "up" : delta < 0 ? "down" : "";
 }
 
-function statCardHTML(card, data) {
+// `selectable` cards pick which series a switchable chart shows (see
+// setupChartControls); they act as toggle buttons.
+function statCardHTML(card, data, selectable) {
+  const attrs = selectable
+    ? ` class="card card-select" role="button" tabindex="0" aria-pressed="false" data-path="${card.path}"`
+    : ` class="card"`;
   const m = getPath(data, card.path);
   if (!m || m.latest === null || m.latest === undefined) {
-    return `<div class="card"><div class="card-label">${card.label}</div><div class="card-value">—</div></div>`;
+    return `<div${attrs}><div class="card-label">${card.label}</div><div class="card-value">—</div></div>`;
   }
   const dClass = deltaClass(m.delta);
   const staleBadge = m.stale ? `<span class="badge stale">Stale ${m.days_since}d</span>` : "";
@@ -30,7 +35,7 @@ function statCardHTML(card, data) {
       ? `<span class="delta ${dClass}">${arrow} ${Math.abs(m.delta).toFixed(2)}${card.unit && card.unit !== "$" ? card.unit : ""}</span>`
       : "";
   return `
-    <div class="card">
+    <div${attrs}>
       <div class="card-label">${card.label} ${staleBadge}</div>
       <div class="card-value">${fmt(m.latest, card.unit)}</div>
       <div class="card-meta">${deltaStr} <span class="as-of">${m.as_of || ""}</span></div>
@@ -323,7 +328,13 @@ function chartControlsHTML(section) {
   return html;
 }
 
-// Wires a section's range buttons, date inputs and line toggles to its chart.
+// On a switchable chart, the series a card shows (so the card can select it).
+function chartSeriesFor(section, path) {
+  return Boolean(section.chart && section.chart.switchable && section.chart.series.some((s) => s.path === path));
+}
+
+// Wires a section's range buttons, date inputs, line toggles and (on a
+// switchable chart) selectable cards to its chart.
 // Preset ranges are measured over the lines currently shown, so "Max" starts
 // where the longest visible series starts.
 function setupChartControls(el, section, data) {
@@ -333,7 +344,10 @@ function setupChartControls(el, section, data) {
   const toInput = el.querySelector(`#${section.id}-to`);
   const rangeButtons = [...el.querySelectorAll(".range-btns button")];
   const toggleButtons = [...el.querySelectorAll(".series-toggle")];
-  const shown = new Set(chart.series.map((_, i) => i));
+  const selectCards = [...el.querySelectorAll(".card-select")];
+  const title = el.querySelector(".chart-title");
+  // A switchable chart shows one series at a time, starting with the first.
+  const shown = new Set(chart.switchable ? [0] : chart.series.map((_, i) => i));
   const historyOf = (s) => (getPath(data, s.path) || {}).history || [];
   const span = (series) => {
     const dates = series.flatMap((s) => historyOf(s).map(([d]) => d)).sort();
@@ -350,7 +364,7 @@ function setupChartControls(el, section, data) {
       toInput.value = to || "";
     }
     const visible = chart.series.filter((_, i) => shown.has(i));
-    renderLineChart(canvasId, visible, data, from, to, Boolean(chart.toggles));
+    renderLineChart(canvasId, visible, data, from, to, Boolean(chart.toggles || chart.switchable));
   }
 
   function applyRange(range) {
@@ -380,6 +394,30 @@ function setupChartControls(el, section, data) {
     b.setAttribute("aria-pressed", String(shown.has(i)));
     if (activeRange) applyRange(activeRange); else draw();
   }));
+
+  function select(i) {
+    shown.clear();
+    shown.add(i);
+    const s = chart.series[i];
+    selectCards.forEach((c) => c.setAttribute("aria-pressed", String(c.dataset.path === s.path)));
+    if (title) title.textContent = s.title || s.label;
+  }
+
+  selectCards.forEach((card) => {
+    const i = chart.series.findIndex((s) => s.path === card.dataset.path);
+    const choose = () => {
+      select(i);
+      if (activeRange) applyRange(activeRange); else draw();
+    };
+    card.addEventListener("click", choose);
+    card.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        choose();
+      }
+    });
+  });
+  if (chart.switchable) select(0);
 
   if (chart.ranges && allFirst) {
     fromInput.min = toInput.min = allFirst;
@@ -421,10 +459,10 @@ function renderSection(section, data) {
   if (section.description) html += `<p class="section-desc">${section.description}</p>`;
   if (section.cards) {
     const cols = section.cardColumns ? ` style="--card-cols:${section.cardColumns}"` : "";
-    html += `<div class="card-grid"${cols}>${section.cards.map((c) => statCardHTML(c, data)).join("")}</div>`;
+    html += `<div class="card-grid"${cols}>${section.cards.map((c) => statCardHTML(c, data, chartSeriesFor(section, c.path))).join("")}</div>`;
   }
-  if (section.chart && (section.chart.ranges || section.chart.toggles)) {
-    html += `<h3 class="chart-title">${section.chart.title}</h3>${chartControlsHTML(section)}`;
+  if (section.chart && (section.chart.ranges || section.chart.toggles || section.chart.switchable)) {
+    html += `<h3 class="chart-title">${section.chart.title || ""}</h3>${chartControlsHTML(section)}`;
     html += `<div class="chart-box"><canvas id="chart-${section.id}"></canvas></div>`;
     if (section.chart.note) html += `<p class="chart-note">${section.chart.note}</p>`;
   } else if (section.chart) {
@@ -435,7 +473,7 @@ function renderSection(section, data) {
   }
   el.innerHTML = html;
 
-  if (section.chart && (section.chart.ranges || section.chart.toggles)) {
+  if (section.chart && (section.chart.ranges || section.chart.toggles || section.chart.switchable)) {
     requestAnimationFrame(() => setupChartControls(el, section, data));
   } else if (section.chart) {
     requestAnimationFrame(() => renderLineChart(`chart-${section.id}`, section.chart.series, data));

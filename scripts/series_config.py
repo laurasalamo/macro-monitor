@@ -90,7 +90,7 @@ STALE_THRESHOLD_DAYS = {
 CHART_HISTORY_KEYS = {
     "hy_oas", "ig_oas", "em_corp_oas",
     "breakeven_5y", "breakeven_10y", "forward_5y5y", "real_10y", "tips_5y", "core_pce_yoy",
-    "nfci",
+    "nfci", "fed_assets", "rrp", "m2",
     "unemployment",
     "y10", "y5", "y2",
 }
