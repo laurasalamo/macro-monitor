@@ -3,16 +3,22 @@
 
 const CHART_COLORS = ["#2563eb", "#dc2626", "#d97706", "#16a34a", "#7c3aed", "#0891b2"];
 
-function renderLineChart(canvasId, seriesDefs, data) {
+// `from`/`to` (ISO dates, optional) limit the chart to a window; only points
+// inside it are plotted so the y-axis fits the visible range. Re-rendering the
+// same canvas replaces its chart.
+function renderLineChart(canvasId, seriesDefs, data, from, to) {
   const canvas = document.getElementById(canvasId);
   if (!canvas) return;
+  const existing = Chart.getChart(canvas);
+  if (existing) existing.destroy();
+  const inWindow = ([d]) => (!from || d >= from) && (!to || d <= to);
 
   const datasets = seriesDefs.map((s, i) => {
     const m = getPath(data, s.path);
     const hist = (m && m.history) || [];
     return {
       label: s.label,
-      data: hist.map(([d, v]) => ({ x: d, y: v })),
+      data: hist.filter(inWindow).map(([d, v]) => ({ x: d, y: v })),
       borderColor: s.color || CHART_COLORS[i % CHART_COLORS.length],
       backgroundColor: "transparent",
       borderWidth: 1.5,
@@ -28,7 +34,10 @@ function renderLineChart(canvasId, seriesDefs, data) {
       responsive: true,
       maintainAspectRatio: false,
       scales: {
-        x: { type: "time", time: { unit: "month" }, ticks: { maxRotation: 0 } },
+        x: from || to
+          ? { type: "time", min: from ? localDate(from).getTime() : undefined, max: to ? localDate(to).getTime() : undefined,
+              ticks: { maxRotation: 0, autoSkipPadding: 16 } }
+          : { type: "time", time: { unit: "month" }, ticks: { maxRotation: 0 } },
         y: { beginAtZero: false },
       },
       plugins: { legend: { position: "bottom" } },

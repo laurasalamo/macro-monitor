@@ -139,6 +139,16 @@ function isoYearsBefore(isoDate, years) {
   return `${Number(y) - years}-${m}-${d}`;
 }
 
+function isoMonthsBefore(isoDate, months) {
+  const [y, m, d] = isoDate.split("-").map(Number);
+  const target = new Date(y, m - 1 - months, 1);
+  // Clamp the day so e.g. May 31 minus 3 months lands on Feb 28, not Mar 3.
+  const lastDay = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
+  target.setDate(Math.min(d, lastDay));
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${target.getFullYear()}-${pad(target.getMonth() + 1)}-${pad(target.getDate())}`;
+}
+
 function fredUrl(fred) {
   return fred.includes(",")
     ? `https://fred.stlouisfed.org/graph/?id=${fred}`
@@ -282,6 +292,66 @@ function renderMomentumSection(section, momentum) {
   return html;
 }
 
+// ---------------------------------------------------------------- section chart ranges
+
+const RANGE_MONTHS = { "3M": 3, "6M": 6, "1Y": 12, "2Y": 24, "5Y": 60, "10Y": 120 };
+
+function chartRangeControlsHTML(section) {
+  const id = section.id;
+  return `
+    <div class="chart-controls">
+      <div class="range-btns" role="group" aria-label="Time range">
+        ${section.chart.ranges.map((r) => `<button type="button" data-range="${r}">${r}</button>`).join("")}
+      </div>
+      <div class="date-range">
+        <label for="${id}-from">From</label><input type="date" id="${id}-from">
+        <label for="${id}-to">to</label><input type="date" id="${id}-to">
+      </div>
+    </div>`;
+}
+
+// Wires a section's range buttons and date inputs to its line chart. The full
+// span is the union of every series' history.
+function setupChartRanges(el, section, data) {
+  const canvasId = `chart-${section.id}`;
+  const fromInput = el.querySelector(`#${section.id}-from`);
+  const toInput = el.querySelector(`#${section.id}-to`);
+  const buttons = [...el.querySelectorAll(".range-btns button")];
+  const dates = section.chart.series.flatMap((s) => ((getPath(data, s.path) || {}).history || []).map(([d]) => d)).sort();
+  if (!dates.length) {
+    renderLineChart(canvasId, section.chart.series, data);
+    return;
+  }
+  const firstDate = dates[0];
+  const lastDate = dates[dates.length - 1];
+  fromInput.min = toInput.min = firstDate;
+  fromInput.max = toInput.max = lastDate;
+
+  function draw(from, to) {
+    fromInput.value = from;
+    toInput.value = to;
+    renderLineChart(canvasId, section.chart.series, data, from, to);
+  }
+
+  function applyRange(range) {
+    buttons.forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.range === range)));
+    const months = RANGE_MONTHS[range];
+    const from = months ? isoMonthsBefore(lastDate, months) : firstDate;
+    draw(from < firstDate ? firstDate : from, lastDate);
+  }
+
+  function applyCustomRange() {
+    if (!fromInput.value || !toInput.value || fromInput.value >= toInput.value) return;
+    buttons.forEach((b) => b.setAttribute("aria-pressed", "false"));
+    draw(fromInput.value, toInput.value);
+  }
+
+  buttons.forEach((b) => b.addEventListener("click", () => applyRange(b.dataset.range)));
+  fromInput.addEventListener("change", applyCustomRange);
+  toInput.addEventListener("change", applyCustomRange);
+  applyRange(section.chart.defaultRange || section.chart.ranges[section.chart.ranges.length - 1]);
+}
+
 function renderSection(section, data) {
   const el = document.createElement("section");
   el.id = section.id;
@@ -311,7 +381,11 @@ function renderSection(section, data) {
   if (section.cards) {
     html += `<div class="card-grid">${section.cards.map((c) => statCardHTML(c, data)).join("")}</div>`;
   }
-  if (section.chart) {
+  if (section.chart && section.chart.ranges) {
+    html += `<h3 class="chart-title">${section.chart.title}</h3>${chartRangeControlsHTML(section)}`;
+    html += `<div class="chart-box"><canvas id="chart-${section.id}"></canvas></div>`;
+    if (section.chart.note) html += `<p class="chart-note">${section.chart.note}</p>`;
+  } else if (section.chart) {
     html += `<div class="chart-box"><h3>${section.chart.title}</h3><canvas id="chart-${section.id}"></canvas></div>`;
   }
   if (section.barChart) {
@@ -319,7 +393,9 @@ function renderSection(section, data) {
   }
   el.innerHTML = html;
 
-  if (section.chart) {
+  if (section.chart && section.chart.ranges) {
+    requestAnimationFrame(() => setupChartRanges(el, section, data));
+  } else if (section.chart) {
     requestAnimationFrame(() => renderLineChart(`chart-${section.id}`, section.chart.series, data));
   }
   if (section.barChart) {

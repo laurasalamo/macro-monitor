@@ -154,6 +154,23 @@ main {
   margin-top: 8px;
 }
 
+.chart-title { margin: 20px 0 0; }
+
+.chart-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+  margin: 10px 0 4px;
+  font-size: 0.82rem;
+}
+
+.chart-note {
+  margin: 6px 0 0;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
 .error {
   color: var(--red);
 }

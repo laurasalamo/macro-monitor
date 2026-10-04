@@ -38,7 +38,11 @@ const SECTIONS = [
       { label: "EM Corp OAS", path: "credit_spreads.em_corp_oas", unit: "pp" },
     ],
     chart: {
-      title: "Credit Spreads — 5Y",
+      title: "Credit Spreads",
+      // Range buttons above the chart; "Max" is everything data.json has.
+      ranges: ["3M", "6M", "1Y", "2Y", "Max"],
+      defaultRange: "Max",
+      note: "FRED publishes only the last 3 years of ICE BofA spread data.",
       series: [
         { path: "credit_spreads.hy_oas", label: "HY OAS", color: "#dc2626" },
         { path: "credit_spreads.ig_oas", label: "IG OAS", color: "#2563eb" },
