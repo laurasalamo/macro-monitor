@@ -174,7 +174,7 @@ function renderIndicatorChart(canvasId, lines, recessions, from, to) {
           grid: { color: border },
         },
         y: {
-          ticks: { color: muted, callback: (v) => `${v}${unit}` },
+          ticks: { color: muted, callback: (v) => `${v.toLocaleString(undefined, { maximumFractionDigits: 2 })}${unit}` },
           // Emphasize zero, where spreads invert and payrolls turn negative.
           grid: { color: (c) => (c.tick && c.tick.value === 0 ? muted : border) },
         },
