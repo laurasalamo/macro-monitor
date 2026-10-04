@@ -85,16 +85,10 @@ function renderRegimeSection(regime) {
   const unscoredSeg = unscored > 0 ? `<div class="score-seg state-none" style="flex:${unscored}" title="${unscored} no data"></div>` : "";
 
   const history = regime.trailing_36mo_counts || {};
-  const months = Object.values(history).reduce((a, b) => a + b, 0) || 1;
-  const historyBar = Object.entries(history)
-    .filter(([, n]) => n > 0)
-    .map(([l, n]) => {
-      const pct = ((n / months) * 100).toFixed(1);
-      return `<div class="regime-seg state-${l.toLowerCase()}" style="width:${pct}%" title="${l}: ${n}mo"></div>`;
-    })
-    .join("");
+  const monthly = regime.monthly || [];
+  const latestMonth = monthly.length ? monthly[monthly.length - 1].month : "";
   const historyLegend = Object.entries(history)
-    .map(([l, n]) => `<span class="legend-item"><span class="legend-swatch state-${l.toLowerCase()}"></span>${l} (${n}mo)</span>`)
+    .map(([l, n]) => `<span class="legend-item"><span class="legend-swatch state-${l.toLowerCase()}"></span>${l} <span class="legend-count">(${n}mo)</span></span>`)
     .join("");
 
   return `
@@ -115,9 +109,13 @@ function renderRegimeSection(regime) {
     </div>
     <div class="ind-grid">${REGIME_CARDS.map((cd) => indicatorCardHTML(cd, cards[cd.key])).join("")}</div>
     <p class="ind-hint">Net score (bullish − bearish) of +3 or more = Bullish, −3 or less = Bearish. Click any indicator for its full history.</p>
-    <h3>Regime History (trailing 36mo)</h3>
-    <div class="regime-bar">${historyBar}</div>
+    <div class="history-head">
+      <h3>Regime History</h3>
+      ${latestMonth ? `<span class="month-badge">${latestMonth}</span>` : ""}
+    </div>
+    <p class="section-desc">Monthly regime from the 7 indicators above, last ${monthly.length} months. Bar height is the net score (bullish − bearish); the dashed line marks the +3 Bullish cutoff. Hover a bar for its breakdown.</p>
     <div class="regime-legend">${historyLegend}</div>
+    <div class="history-chart"><canvas id="regime-history-chart"></canvas></div>
   `;
 }
 
@@ -291,6 +289,9 @@ function renderSection(section, data) {
 
   if (section.kind === "regime") {
     el.innerHTML = renderRegimeSection(data.regime);
+    if (data.regime && data.regime.monthly) {
+      requestAnimationFrame(() => renderRegimeHistoryChart("regime-history-chart", data.regime.monthly, data.regime.total));
+    }
     return el;
   }
 

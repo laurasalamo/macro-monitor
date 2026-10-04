@@ -217,6 +217,10 @@ def build_regime_section(metrics):
         "counts": counts,
         "total": len(regime.INDICATORS),
         "trailing_36mo_counts": regime.trailing_regime_counts(monthly),
+        "monthly": [
+            {"month": ym, "label": label, "net": c[regime.BULLISH] - c[regime.BEARISH], **c}
+            for ym, label, c in monthly
+        ],
         "snapshot_cards": cards,
     }
 

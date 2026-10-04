@@ -304,25 +304,46 @@ main {
 .state-bearish { --state-bg: var(--bear-bg); --state-border: var(--bear-border); --state-text: var(--bear-text); --state-fill: var(--bear-fill); }
 .state-none    { --state-bg: var(--card-bg); --state-border: var(--border); --state-text: var(--text-muted); --state-fill: var(--text-muted); }
 
-.score-seg, .regime-seg, .legend-swatch { background: var(--state-fill); }
+.score-seg, .legend-swatch { background: var(--state-fill); }
 
-.regime-bar {
+.history-head {
   display: flex;
-  height: 24px;
-  border-radius: 6px;
-  overflow: hidden;
-  border: 1px solid var(--border);
+  align-items: center;
+  gap: 10px;
+  margin-top: 24px;
 }
 
-.regime-seg { height: 100%; }
+.history-head h3 { margin: 0; color: var(--text); font-size: 1rem; }
+
+.month-badge {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-variant-numeric: tabular-nums;
+}
+
+.history-head + .section-desc { margin-top: 8px; margin-bottom: 10px; }
 
 .regime-legend {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
-  margin-top: 10px;
-  font-size: 0.8rem;
-  color: var(--text-muted);
+  gap: 8px 18px;
+  margin-bottom: 10px;
+  font-size: 0.85rem;
+  color: var(--text);
+}
+
+.legend-count { color: var(--text-muted); font-size: 0.75rem; }
+
+.history-chart {
+  position: relative;
+  height: 220px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 14px 6px;
 }
 
 .legend-item { display: flex; align-items: center; gap: 6px; }

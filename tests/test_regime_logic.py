@@ -138,17 +138,18 @@ def test_monthly_labels_carry_forward_latest_observation():
     series_by_key["claims_4wk"].append(("2024-04-06", 350.0))
     series_by_key["payrolls_mom"].append(("2024-04-01", -20.0))
 
-    labels = regime.monthly_labels(series_by_key, ["2024-01", "2024-02", "2024-03", "2024-04"])
-    assert labels == [
+    monthly = regime.monthly_labels(series_by_key, ["2024-01", "2024-02", "2024-03", "2024-04"])
+    assert [(ym, label) for ym, label, _ in monthly] == [
         ("2024-01", "Bullish"),   # 7 bullish
         ("2024-02", "Bullish"),
         ("2024-03", "Neutral"),   # 4 bullish, 3 bearish
         ("2024-04", "Bearish"),   # 2 bullish, 5 bearish
     ]
+    assert monthly[3][2] == {BULLISH: 2, NEUTRAL: 0, BEARISH: 5}
 
 
 def test_trailing_regime_counts():
-    labelled = [("2024-01", "Bullish"), ("2024-02", "Bullish"), ("2024-03", "Bearish")]
+    labelled = [("2024-01", "Bullish", {}), ("2024-02", "Bullish", {}), ("2024-03", "Bearish", {})]
     assert regime.trailing_regime_counts(labelled) == {"Bullish": 2, "Neutral": 0, "Bearish": 1}
 
 

@@ -105,17 +105,19 @@ def value_as_of(series, year_month):
 
 def monthly_labels(series_by_key, months):
     """Classify each month using every indicator's latest observation up to it.
-    series_by_key: indicator key -> ascending [(date, value)]. Returns [(month, label)]."""
+    series_by_key: indicator key -> ascending [(date, value)].
+    Returns [(month, label, state_counts)]."""
     out = []
     for ym in months:
         values = {k: value_as_of(s, ym) for k, s in series_by_key.items()}
-        out.append((ym, classify(state_counts(values))))
+        counts = state_counts(values)
+        out.append((ym, classify(counts), counts))
     return out
 
 
 def trailing_regime_counts(labelled_months):
-    """labelled_months: iterable of (month, label). Returns a dict of label -> month count."""
+    """labelled_months: iterable of (month, label, ...). Returns a dict of label -> month count."""
     counts = {label: 0 for label in REGIME_LABELS}
-    for _, label in labelled_months:
+    for _, label, *_ in labelled_months:
         counts[label] += 1
     return counts

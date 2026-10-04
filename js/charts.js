@@ -182,3 +182,89 @@ function renderIndicatorChart(canvasId, lines, recessions, from, to) {
     },
   });
 }
+
+// ---------------------------------------------------------------- regime history bars
+
+// Dashed horizontal lines at fixed y values (e.g. the +3 Bullish cutoff) plus a solid zero line.
+const referenceLines = {
+  id: "referenceLines",
+  afterDatasetsDraw(chart, _args, opts) {
+    const { ctx, chartArea: area, scales: { y } } = chart;
+    ctx.save();
+    for (const line of opts.lines || []) {
+      if (line.value < y.min || line.value > y.max) continue;
+      const py = Math.round(y.getPixelForValue(line.value)) + 0.5;
+      ctx.strokeStyle = line.color;
+      ctx.lineWidth = 1;
+      ctx.setLineDash(line.dash || []);
+      ctx.beginPath();
+      ctx.moveTo(area.left, py);
+      ctx.lineTo(area.right, py);
+      ctx.stroke();
+    }
+    ctx.restore();
+  },
+};
+
+function renderRegimeHistoryChart(canvasId, monthly, total) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas || !monthly.length) return;
+  const css = getComputedStyle(document.documentElement);
+  const v = (name) => css.getPropertyValue(name).trim();
+  const fill = { Bullish: v("--bull-fill"), Neutral: v("--neut-fill"), Bearish: v("--bear-fill") };
+  const muted = v("--text-muted");
+  const cutoff = 3; // keep in sync with NET_SCORE_THRESHOLD in scripts/regime_logic.py
+  const anyNegative = monthly.some((m) => m.net < 0);
+  const last = monthly.length - 1;
+
+  new Chart(canvas.getContext("2d"), {
+    type: "bar",
+    data: {
+      labels: monthly.map((m) => m.month),
+      datasets: [{
+        data: monthly.map((m) => m.net),
+        backgroundColor: monthly.map((m) => fill[m.label]),
+        borderRadius: 4,
+        borderSkipped: false,
+        minBarLength: 3, // keep net-zero months visible
+        categoryPercentage: 0.92,
+        barPercentage: 0.94,
+      }],
+    },
+    plugins: [referenceLines],
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      scales: {
+        x: {
+          grid: { display: false },
+          border: { display: false },
+          // Label every 12th month counting back from the latest, like 2024-10 / 2025-10 / 2026-10.
+          ticks: { color: muted, maxRotation: 0, autoSkip: false, callback: (_val, i) => ((last - i) % 12 === 0 ? monthly[i].month : "") },
+        },
+        y: { display: false, min: anyNegative ? -total : 0, max: total },
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          displayColors: false,
+          callbacks: {
+            title: (items) => `${monthly[items[0].dataIndex].month} — ${monthly[items[0].dataIndex].label}`,
+            label: (item) => {
+              const m = monthly[item.dataIndex];
+              return [`Net score ${m.net > 0 ? "+" : ""}${m.net}`, `${m.bullish} bullish · ${m.neutral} neutral · ${m.bearish} bearish`];
+            },
+          },
+        },
+        referenceLines: {
+          lines: [
+            { value: 0, color: v("--border") },
+            { value: cutoff, color: muted, dash: [4, 4] },
+            { value: -cutoff, color: muted, dash: [4, 4] },
+          ],
+        },
+      },
+    },
+  });
+}
