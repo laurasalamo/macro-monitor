@@ -199,8 +199,6 @@ main {
   border-top: 3px solid var(--swatch);
 }
 
-.swatch.dashed { border-top-style: dashed; }
-
 .chart-note {
   margin: 6px 0 0;
   font-size: 0.75rem;

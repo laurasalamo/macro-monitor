@@ -23,7 +23,6 @@ function renderLineChart(canvasId, seriesDefs, data, from, to, hideLegend) {
       borderColor: s.color || CHART_COLORS[i % CHART_COLORS.length],
       backgroundColor: "transparent",
       borderWidth: 1.5,
-      borderDash: s.dashed ? [6, 4] : [],
       pointRadius: 0,
       tension: 0.15,
     };

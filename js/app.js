@@ -304,7 +304,7 @@ function chartControlsHTML(section) {
     <div class="series-toggles" role="group" aria-label="Lines shown">
       ${chart.series.map((s, i) => `
         <button type="button" class="series-toggle" data-index="${i}" aria-pressed="true">
-          <span class="swatch${s.dashed ? " dashed" : ""}" style="--swatch:${s.color}"></span>${s.label}
+          <span class="swatch" style="--swatch:${s.color}"></span>${s.label}
         </button>`).join("")}
     </div>`;
   }
