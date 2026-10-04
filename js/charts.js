@@ -97,3 +97,88 @@ function renderYieldCurveChart(canvasId, yieldCurve) {
     },
   });
 }
+
+// ---------------------------------------------------------------- indicator pop-up chart
+
+function localDate(isoDate) {
+  const [y, m, d] = isoDate.split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+
+// Gray bands behind the lines for each recession. Ranges are [firstMonth, lastMonth]
+// from USREC, so a band runs to the end of its last month.
+const recessionShading = {
+  id: "recessionShading",
+  beforeDatasetsDraw(chart, _args, opts) {
+    const { ctx, chartArea: area, scales: { x } } = chart;
+    ctx.save();
+    ctx.fillStyle = opts.color;
+    for (const [start, end] of opts.ranges || []) {
+      const last = localDate(end);
+      const x0 = Math.max(x.getPixelForValue(localDate(start).getTime()), area.left);
+      const x1 = Math.min(x.getPixelForValue(new Date(last.getFullYear(), last.getMonth() + 1, 1).getTime()), area.right);
+      if (x1 > x0) ctx.fillRect(x0, area.top, x1 - x0, area.bottom - area.top);
+    }
+    ctx.restore();
+  },
+};
+
+let indicatorChart = null;
+
+function renderIndicatorChart(canvasId, lines, recessions, from, to) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  const css = getComputedStyle(document.documentElement);
+  const muted = css.getPropertyValue("--text-muted").trim();
+  const border = css.getPropertyValue("--border").trim();
+
+  // Only plot the visible window so the y-axis fits it, like FRED does.
+  const datasets = lines.map((line, i) => ({
+    label: line.label,
+    data: line.data.filter(([d]) => d >= from && d <= to).map(([d, v]) => ({ x: d, y: v })),
+    borderColor: line.secondary ? muted : CHART_COLORS[i % CHART_COLORS.length],
+    borderWidth: line.secondary ? 1 : 1.75,
+    backgroundColor: "transparent",
+    pointRadius: 0,
+    tension: 0,
+    order: line.secondary ? 1 : 0,
+  }));
+  const unit = lines[0].unit;
+
+  if (indicatorChart) indicatorChart.destroy();
+  indicatorChart = new Chart(canvas.getContext("2d"), {
+    type: "line",
+    data: { datasets },
+    plugins: [recessionShading],
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      parsing: true,
+      scales: {
+        x: {
+          type: "time",
+          min: localDate(from).getTime(),
+          max: localDate(to).getTime(),
+          ticks: { maxRotation: 0, autoSkipPadding: 16, color: muted },
+          grid: { color: border },
+        },
+        y: {
+          ticks: { color: muted, callback: (v) => `${v}${unit}` },
+          // Emphasize zero, where spreads invert and payrolls turn negative.
+          grid: { color: (c) => (c.tick && c.tick.value === 0 ? muted : border) },
+        },
+      },
+      plugins: {
+        legend: { display: lines.length > 1, position: "bottom", labels: { color: muted } },
+        tooltip: {
+          callbacks: {
+            label: (c) => `${c.dataset.label}: ${c.parsed.y.toLocaleString(undefined, { maximumFractionDigits: 2 })}${unit}`,
+          },
+        },
+        recessionShading: { ranges: recessions, color: css.getPropertyValue("--recession").trim() },
+      },
+      interaction: { mode: "index", intersect: false },
+    },
+  });
+}

@@ -24,6 +24,7 @@ FRED_SERIES = {
     "saving_rate":      ("PSAVERT",         "level",      "%",  "monthly"),
     "fed_funds":        ("DFF",             "level",      "%",  "daily"),
     "initial_claims":   ("ICSA",            "level",      "K",  "weekly"),
+    "claims_4wk":       ("IC4WSA",          "level",      "K",  "weekly"),
     "participation":    ("CIVPART",         "level",      "%",  "monthly"),
 
     "spread_10y2y":     ("T10Y2Y",          "level",      "pp", "daily"),
@@ -59,6 +60,7 @@ SCALE = {
     "fed_assets": 1e-6,  # millions of $ -> trillions of $
     "m2": 1e-3,          # billions of $ -> trillions of $
     "rrp": 1e-3,         # billions of $ -> trillions of $
+    "claims_4wk": 1e-3,  # claims -> thousands of claims
 }
 
 # Tenor points for the yield-curve-shape snapshot (current vs. 1 year ago).
@@ -80,8 +82,9 @@ STALE_THRESHOLD_DAYS = {
 }
 
 # Metrics whose history is written to data.json because js/config.js charts
-# them. Every other metric ships only latest/delta/as_of (history is still
-# fetched and used in-memory, e.g. for the regime calculation). Keep in sync
+# them. Every other metric ships only latest/delta/as_of (full history is still
+# fetched and used in-memory, e.g. for the regime calculation, and the regime
+# indicators' full history goes to data/regime_history.json). Keep in sync
 # with the `chart.series` paths in js/config.js.
 CHART_HISTORY_KEYS = {
     "hy_oas", "ig_oas", "em_corp_oas",
@@ -91,8 +94,12 @@ CHART_HISTORY_KEYS = {
     "y10", "y2",
 }
 
-# Years of history to keep per metric (default 5, override per key).
+# Years of history to keep in data.json per charted metric (default 5, override per key).
 HISTORY_YEARS = {
     "default": 5,
     "unemployment": 2,
 }
+
+# Regime pop-up charts: daily series older than this many years are thinned to
+# one point per week to keep data/regime_history.json small.
+REGIME_HISTORY_DAILY_YEARS = 10

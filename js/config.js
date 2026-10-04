@@ -1,6 +1,29 @@
 // Section/card/chart definitions driving the generic renderer in app.js.
 // Adding or removing a card later is a matter of editing this array only.
 
+// Regime Dashboard indicator cards. Thresholds and bullish/neutral/bearish
+// ratings come from scripts/regime_logic.py via data.json; this only covers
+// presentation. `period` drives how the as-of date reads; `lineLabel` renames the
+// main chart line; `extra` adds more
+// lines to the card's pop-up chart.
+const REGIME_CARDS = [
+  { key: "gdp_growth", label: "GDP Growth", suffix: "% real growth", unit: "%", period: "quarter",
+    title: "Real GDP Growth (annualized, quarter over quarter)", fred: "A191RL1Q225SBEA" },
+  { key: "cpi_yoy", label: "Inflation (CPI)", suffix: "% YoY", unit: "%", period: "month",
+    title: "CPI Inflation (year over year)", fred: "CPIAUCSL" },
+  { key: "unemployment", label: "Unemployment", suffix: "%", unit: "%", period: "month",
+    title: "Unemployment Rate", fred: "UNRATE" },
+  { key: "payrolls_mom", label: "Payrolls MoM", suffix: "K", unit: "K", signed: true, period: "month",
+    title: "Nonfarm Payrolls, monthly change (thousands)", fred: "PAYEMS" },
+  { key: "spread_10y2y", label: "10Y-2Y Spread", suffix: "pp", unit: "pp", signed: true, period: "day",
+    title: "10-Year minus 2-Year Treasury Yield", fred: "T10Y2Y" },
+  { key: "spread_2y3m", label: "2Y-3M Spread", suffix: "pp", unit: "pp", signed: true, period: "day",
+    title: "2-Year minus 3-Month Treasury Yield", fred: "DGS2,DGS3MO" },
+  { key: "claims_4wk", label: "Jobless Claims", suffix: "K", unit: "K", period: "week",
+    title: "Initial Jobless Claims, 4-week average (thousands)", fred: "IC4WSA",
+    lineLabel: "4-week average", extra: [{ key: "initial_claims", label: "Weekly" }] },
+];
+
 const SECTIONS = [
   { id: "regime", title: "Regime Dashboard", kind: "regime" },
 

@@ -92,3 +92,31 @@ def nearest_point(series, target_date_str):
         return None
     target = date.fromisoformat(target_date_str)
     return min(series, key=lambda p: abs((date.fromisoformat(p[0]) - target).days))
+
+
+def thin_to_weekly_before(series, cutoff_date_str):
+    """Keep every observation from cutoff_date_str on; before it, keep only the
+    last observation of each ISO week. Shrinks decades of daily data for charts."""
+    out = []
+    for d, v in series:
+        if d < cutoff_date_str and out and out[-1][0] < cutoff_date_str:
+            if date.fromisoformat(d).isocalendar()[:2] == date.fromisoformat(out[-1][0]).isocalendar()[:2]:
+                out[-1] = (d, v)
+                continue
+        out.append((d, v))
+    return out
+
+
+def recession_ranges(series):
+    """series: ascending [(date, 0|1)] recession indicator (e.g. FRED USREC).
+    Returns [[first_date, last_date], ...] for each run of 1s."""
+    ranges = []
+    for d, v in series:
+        if v >= 1:
+            if ranges and ranges[-1][2]:
+                ranges[-1][1] = d
+            else:
+                ranges.append([d, d, True])
+        elif ranges:
+            ranges[-1][2] = False
+    return [[start, end] for start, end, _ in ranges]

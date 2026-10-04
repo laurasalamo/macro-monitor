@@ -27,6 +27,7 @@ from series_config import (
     CHART_HISTORY_KEYS,
     FRED_SERIES,
     HISTORY_YEARS,
+    REGIME_HISTORY_DAILY_YEARS,
     SCALE,
     STALE_THRESHOLD_DAYS,
     YIELD_CURVE_TENORS,
@@ -68,9 +69,6 @@ def build_metric(key, cfg, api_key, warnings):
         latest, delta, as_of = tx.latest_and_delta(series)
         days_since, stale = tx.staleness(as_of, frequency, STALE_THRESHOLD_DAYS)
 
-        years = HISTORY_YEARS.get(key, HISTORY_YEARS["default"])
-        history = tx.trim_history(series, years_ago_iso(years))
-
         return {
             "latest": round(latest, 4) if latest is not None else None,
             "delta": round(delta, 4) if delta is not None else None,
@@ -78,7 +76,7 @@ def build_metric(key, cfg, api_key, warnings):
             "stale": stale,
             "days_since": days_since,
             "unit": unit,
-            "history": [[d, round(v, 4)] for d, v in history],
+            "history": [[d, round(v, 4)] for d, v in series],
         }
     except Exception as e:  # keep going on a single bad series
         warnings.append(f"{key} ({fred_id}): {e}")
@@ -90,7 +88,6 @@ def fetch_gold(warnings):
         series = get_gold_series()
         latest, delta, as_of = tx.latest_and_delta(series)
         days_since, stale = tx.staleness(as_of, "daily", STALE_THRESHOLD_DAYS)
-        history = tx.trim_history(series, years_ago_iso(HISTORY_YEARS["default"]))
         return {
             "latest": round(latest, 2) if latest is not None else None,
             "delta": round(delta, 2) if delta is not None else None,
@@ -98,7 +95,7 @@ def fetch_gold(warnings):
             "stale": stale,
             "days_since": days_since,
             "unit": "$",
-            "history": [[d, round(v, 2)] for d, v in history],
+            "history": [[d, round(v, 2)] for d, v in series],
         }
     except GoldFetchError as e:
         warnings.append(f"gold (yahoo): {e}")
@@ -132,7 +129,6 @@ def fetch_spread_2y3m(api_key, warnings):
             return None
         latest, delta, as_of = tx.latest_and_delta(spread)
         days_since, stale = tx.staleness(as_of, "daily", STALE_THRESHOLD_DAYS)
-        history = tx.trim_history(spread, years_ago_iso(HISTORY_YEARS["default"]))
         return {
             "latest": round(latest, 4) if latest is not None else None,
             "delta": round(delta, 4) if delta is not None else None,
@@ -140,7 +136,7 @@ def fetch_spread_2y3m(api_key, warnings):
             "stale": stale,
             "days_since": days_since,
             "unit": "pp",
-            "history": [[d, round(v, 4)] for d, v in history],
+            "history": [[d, round(v, 4)] for d, v in spread],
         }
     except Exception as e:
         warnings.append(f"spread_2y3m: {e}")
@@ -184,63 +180,68 @@ def without_history(metric):
     return {k: v for k, v in metric.items() if k != "history"}
 
 
+def with_trimmed_history(metric, years):
+    if not metric:
+        return metric
+    start = years_ago_iso(years)
+    return {**metric, "history": [p for p in metric["history"] if p[0] >= start]}
+
+
 def build_regime_section(metrics):
-    gdp_hist = (metrics.get("gdp_growth") or {}).get("history", [])
-    curve_hist = (metrics.get("spread_10y2y") or {}).get("history", [])
-    unemployment_hist = (metrics.get("unemployment") or {}).get("history", [])
+    series_by_key = {
+        k: (metrics.get(k) or {}).get("history", []) for k in regime.INDICATORS
+    }
+    latest_values = {k: (metrics.get(k) or {}).get("latest") for k in regime.INDICATORS}
+    counts = regime.state_counts(latest_values)
 
-    latest_gdp = gdp_hist[-1][1] if gdp_hist else None
-    trailing_avg_gdp = regime.trailing_average(
-        [v for _, v in gdp_hist[-regime.TREND_LOOKBACK_QUARTERS:]]
-    ) if gdp_hist else None
-    latest_curve = curve_hist[-1][1] if curve_hist else None
-    current_label = regime.classify(latest_gdp, trailing_avg_gdp, latest_curve)
+    # Trailing 36-month history: one classification per calendar month, each
+    # indicator taking its latest observation dated in or before that month.
+    all_months = {d[:7] for s in series_by_key.values() for d, _ in s}
+    months = sorted(all_months)[-regime.TRAILING_MONTHS:]
+    monthly = regime.monthly_labels(series_by_key, months)
 
-    unemployment_3mo_change = None
-    if len(unemployment_hist) >= 4:
-        unemployment_3mo_change = unemployment_hist[-1][1] - unemployment_hist[-4][1]
-
-    bullish_count, bullish_total = regime.bullish_scorecard(
-        (metrics.get("spread_10y2y") or {}).get("latest"),
-        (metrics.get("spread_2y3m") or {}).get("latest"),
-        latest_gdp,
-        unemployment_3mo_change,
-        (metrics.get("payrolls_mom") or {}).get("latest"),
-        (metrics.get("cpi_yoy") or {}).get("latest"),
-    )
-
-    # Trailing 36-month regime history: one classification per calendar month,
-    # holding the latest-known GDP quarter constant across the months within it.
-    curve_by_month = {}
-    for d, v in curve_hist:
-        curve_by_month[d[:7]] = v  # series is ascending, so this keeps the month's last value
-    months = sorted(curve_by_month.keys())[-regime.TRAILING_MONTHS:]
-
-    monthly_points = []
-    for ym in months:
-        gdp_values_to_date = [v for d, v in gdp_hist if d[:7] <= ym]
-        g = gdp_values_to_date[-1] if gdp_values_to_date else None
-        trailing = regime.trailing_average(
-            gdp_values_to_date[-regime.TREND_LOOKBACK_QUARTERS:]
-        ) if gdp_values_to_date else None
-        monthly_points.append((ym, g, trailing, curve_by_month[ym]))
-
-    trailing_counts = regime.trailing_36mo_regime_counts(monthly_points)
+    cards = {}
+    for k in regime.INDICATORS:
+        m = without_history(metrics.get(k))
+        if m:
+            m = {
+                **m,
+                "state": regime.rate(k, m["latest"]),
+                "decimals": regime.DISPLAY_DECIMALS[k],
+                "rule": regime.RULE_TEXT[k],
+            }
+        cards[k] = m
 
     return {
-        "current_label": current_label,
-        "bullish_count": bullish_count,
-        "bullish_total": bullish_total,
-        "trailing_36mo_counts": trailing_counts,
-        "snapshot_cards": {
-            "gdp_growth": metrics.get("gdp_growth"),
-            "cpi_yoy": metrics.get("cpi_yoy"),
-            "unemployment": metrics.get("unemployment"),
-            "payrolls_mom": metrics.get("payrolls_mom"),
-            "spread_10y2y": metrics.get("spread_10y2y"),
-            "spread_2y3m": metrics.get("spread_2y3m"),
-        },
+        "current_label": regime.classify(counts),
+        "counts": counts,
+        "total": len(regime.INDICATORS),
+        "trailing_36mo_counts": regime.trailing_regime_counts(monthly),
+        "snapshot_cards": cards,
     }
+
+
+def fetch_recessions(api_key, warnings):
+    try:
+        return tx.recession_ranges(tx.parse_observations(get_series("USREC", api_key)))
+    except Exception as e:
+        warnings.append(f"recessions (USREC): {e}")
+        return []
+
+
+def build_regime_history(metrics, recessions):
+    """Full history of each regime indicator for the pop-up charts. Old daily
+    data is thinned to weekly; the weekly claims print rides along with the
+    4-week average so the claims chart can show both."""
+    cutoff = years_ago_iso(REGIME_HISTORY_DAILY_YEARS)
+    keys = regime.INDICATORS + ["initial_claims"]
+    series = {}
+    for k in keys:
+        hist = (metrics.get(k) or {}).get("history", [])
+        if k == "initial_claims":
+            hist = [(d, v / 1000) for d, v in hist]  # raw claims -> thousands
+        series[k] = [[d, round(v, 3)] for d, v in tx.thin_to_weekly_before(hist, cutoff)]
+    return {"recessions": recessions, "series": series}
 
 
 def empty_sections(output):
@@ -309,15 +310,17 @@ def main():
         if metrics.get(k) and metrics[k]["latest"] is not None
     ]
 
+    print("Fetching NBER recession dates (USREC)...")
+    recessions = fetch_recessions(api_key, warnings)
+
     regime_section = build_regime_section(metrics)
+    regime_history = build_regime_history(metrics, recessions)
 
     # History is only needed in data.json for charted metrics; drop it
     # everywhere else to keep the daily-committed file small.
-    regime_section["snapshot_cards"] = {
-        k: without_history(m) for k, m in regime_section["snapshot_cards"].items()
-    }
     metrics = {
-        k: m if k in CHART_HISTORY_KEYS else without_history(m)
+        k: with_trimmed_history(m, HISTORY_YEARS.get(k, HISTORY_YEARS["default"]))
+        if k in CHART_HISTORY_KEYS else without_history(m)
         for k, m in metrics.items()
     }
 
@@ -389,6 +392,9 @@ def main():
     with open(os.path.join(DATA_DIR, "data.json"), "w") as f:
         json.dump(output, f, separators=(",", ":"))
 
+    with open(os.path.join(DATA_DIR, "regime_history.json"), "w") as f:
+        json.dump(regime_history, f, separators=(",", ":"))
+
     with open(os.path.join(DATA_DIR, "meta.json"), "w") as f:
         json.dump({"generated_at_utc": output["generated_at_utc"], "warnings": warnings}, f, indent=2)
 
@@ -397,7 +403,7 @@ def main():
         for w in warnings:
             print(f"  WARN: {w}", file=sys.stderr)
 
-    print(f"\nWrote data/data.json and data/meta.json at {output['generated_at_utc']}")
+    print(f"\nWrote data/data.json, data/regime_history.json and data/meta.json at {output['generated_at_utc']}")
 
 
 if __name__ == "__main__":

@@ -236,3 +236,40 @@ def test_nearest_point_tie_picks_earlier():
 
 def test_nearest_point_empty():
     assert tx.nearest_point([], "2024-01-01") is None
+
+
+# ---------------------------------------------------------------- thinning / recessions
+
+def test_thin_to_weekly_before_keeps_last_day_of_each_old_week():
+    # 2024-01-01 is a Monday; 01-08 starts the next ISO week.
+    s = [("2024-01-01", 1.0), ("2024-01-03", 2.0), ("2024-01-05", 3.0),
+         ("2024-01-08", 4.0), ("2024-01-09", 5.0),
+         ("2024-01-15", 6.0), ("2024-01-16", 7.0)]
+    assert tx.thin_to_weekly_before(s, "2024-01-15") == [
+        ("2024-01-05", 3.0), ("2024-01-09", 5.0),
+        ("2024-01-15", 6.0), ("2024-01-16", 7.0),
+    ]
+
+
+def test_thin_to_weekly_before_cutoff_week_straddle():
+    # Points on either side of the cutoff in the same week are both kept.
+    s = [("2024-01-08", 1.0), ("2024-01-10", 2.0), ("2024-01-11", 3.0)]
+    assert tx.thin_to_weekly_before(s, "2024-01-11") == [("2024-01-10", 2.0), ("2024-01-11", 3.0)]
+
+
+def test_thin_to_weekly_before_empty():
+    assert tx.thin_to_weekly_before([], "2024-01-01") == []
+
+
+def test_recession_ranges():
+    s = monthly([0, 1, 1, 0, 0, 1, 0, 1])
+    assert tx.recession_ranges(s) == [
+        ["2020-02-01", "2020-03-01"],
+        ["2020-06-01", "2020-06-01"],
+        ["2020-08-01", "2020-08-01"],
+    ]
+
+
+def test_recession_ranges_none():
+    assert tx.recession_ranges(monthly([0, 0])) == []
+    assert tx.recession_ranges([]) == []

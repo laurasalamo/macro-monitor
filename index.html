@@ -17,6 +17,33 @@
   <div id="sections"></div>
 </main>
 
+<dialog id="ind-modal" class="ind-modal" aria-labelledby="ind-modal-title">
+  <div class="ind-modal-inner">
+    <div class="ind-modal-head">
+      <div>
+        <h2 id="ind-modal-title"></h2>
+        <div id="ind-modal-rule" class="ind-modal-sub"></div>
+      </div>
+      <button type="button" class="ind-modal-close" aria-label="Close">&#x2715;</button>
+    </div>
+    <div class="ind-modal-controls">
+      <div class="range-btns" role="group" aria-label="Time range">
+        <button type="button" data-range="1Y">1Y</button>
+        <button type="button" data-range="5Y">5Y</button>
+        <button type="button" data-range="10Y">10Y</button>
+        <button type="button" data-range="Max">Max</button>
+      </div>
+      <div class="date-range">
+        <label for="ind-from">From</label><input type="date" id="ind-from">
+        <label for="ind-to">to</label><input type="date" id="ind-to">
+      </div>
+      <a id="ind-fred-link" class="fred-link" target="_blank" rel="noopener"></a>
+    </div>
+    <div class="ind-modal-chart"><canvas id="ind-chart"></canvas></div>
+    <div id="ind-modal-note" class="ind-modal-note"></div>
+  </div>
+</dialog>
+
 <footer class="site-footer">
   <p>Personal project. Data via <a href="https://fred.stlouisfed.org" target="_blank" rel="noopener">FRED</a> (Federal Reserve Bank of St. Louis) and <a href="https://finance.yahoo.com" target="_blank" rel="noopener">Yahoo Finance</a>. Refreshed daily.</p>
 </footer>

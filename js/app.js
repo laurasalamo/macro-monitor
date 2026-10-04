@@ -37,57 +37,189 @@ function statCardHTML(card, data) {
     </div>`;
 }
 
+const STATE_WORDS = { bullish: "Bullish", neutral: "Neutral", bearish: "Bearish" };
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+function fmtIndicator(value, cardDef, decimals) {
+  if (value === null || value === undefined || Number.isNaN(value)) return "—";
+  const sign = cardDef.signed && value > 0 ? "+" : "";
+  return `${sign}${value.toFixed(decimals)}${cardDef.suffix}`;
+}
+
+// "Q2 2026", "Sep 2026" or "Oct 2, 2026" depending on the release frequency.
+function fmtPeriod(isoDate, period) {
+  if (!isoDate) return "";
+  const [y, m, d] = isoDate.split("-").map(Number);
+  if (period === "quarter") return `Q${Math.floor((m - 1) / 3) + 1} ${y}`;
+  if (period === "month") return `${MONTHS[m - 1]} ${y}`;
+  return `${MONTHS[m - 1]} ${d}, ${y}`;
+}
+
+function indicatorCardHTML(cd, m) {
+  const state = (m && m.state) || "none";
+  const value = m ? fmtIndicator(m.latest, cd, m.decimals) : "—";
+  const stateWord = STATE_WORDS[state] || "No data";
+  const staleBadge = m && m.stale ? `<span class="badge stale">Stale ${m.days_since}d</span>` : "";
+  return `
+    <button type="button" class="ind-card state-${state}" data-key="${cd.key}" aria-haspopup="dialog"
+            title="${stateWord}. Click to see the history.">
+      <span class="ind-label"><span class="ind-dot" aria-hidden="true"></span>${cd.label}</span>
+      <span class="ind-value">${value}<span class="sr-only"> — ${stateWord}</span></span>
+      <span class="ind-meta">${m ? fmtPeriod(m.as_of, cd.period) : ""} ${staleBadge}</span>
+    </button>`;
+}
+
 function renderRegimeSection(regime) {
   if (!regime) return "<h2>Regime Dashboard</h2><p>No data.</p>";
 
   const cards = regime.snapshot_cards || {};
-  const cardDefs = [
-    { key: "gdp_growth", label: "GDP Growth", unit: "%" },
-    { key: "cpi_yoy", label: "Inflation (CPI)", unit: "%" },
-    { key: "unemployment", label: "Unemployment", unit: "%" },
-    { key: "payrolls_mom", label: "Payrolls MoM", unit: "K" },
-    { key: "spread_10y2y", label: "10Y-2Y Spread", unit: "pp" },
-    { key: "spread_2y3m", label: "2Y-3M Spread", unit: "pp" },
-  ];
-  const cardHTML = cardDefs
-    .map((cd) => {
-      const m = cards[cd.key];
-      return `<div class="card">
-        <div class="card-label">${cd.label}</div>
-        <div class="card-value">${m ? fmt(m.latest, cd.unit) : "—"}</div>
-        <div class="card-meta">${m && m.as_of ? m.as_of : ""}</div>
-      </div>`;
-    })
-    .join("");
+  const counts = regime.counts || { bullish: 0, neutral: 0, bearish: 0 };
+  const total = regime.total || REGIME_CARDS.length;
+  const label = regime.current_label || "Neutral";
 
-  const counts = regime.trailing_36mo_counts || {};
-  const total = Object.values(counts).reduce((a, b) => a + b, 0) || 1;
-  const slug = (s) => s.replace(/\s+/g, "").toLowerCase();
-  const barHTML = Object.entries(counts)
-    .map(([label, n]) => {
-      const pct = ((n / total) * 100).toFixed(1);
-      return `<div class="regime-seg regime-${slug(label)}" style="width:${pct}%" title="${label}: ${n}mo"></div>`;
+  const scoreBar = ["bullish", "neutral", "bearish"]
+    .filter((s) => counts[s] > 0)
+    .map((s) => `<div class="score-seg state-${s}" style="flex:${counts[s]}" title="${counts[s]} ${s}"></div>`)
+    .join("");
+  const unscored = total - counts.bullish - counts.neutral - counts.bearish;
+  const unscoredSeg = unscored > 0 ? `<div class="score-seg state-none" style="flex:${unscored}" title="${unscored} no data"></div>` : "";
+
+  const history = regime.trailing_36mo_counts || {};
+  const months = Object.values(history).reduce((a, b) => a + b, 0) || 1;
+  const historyBar = Object.entries(history)
+    .filter(([, n]) => n > 0)
+    .map(([l, n]) => {
+      const pct = ((n / months) * 100).toFixed(1);
+      return `<div class="regime-seg state-${l.toLowerCase()}" style="width:${pct}%" title="${l}: ${n}mo"></div>`;
     })
     .join("");
-  const legendHTML = Object.entries(counts)
-    .map(
-      ([label, n]) =>
-        `<span class="legend-item"><span class="legend-swatch regime-${slug(label)}"></span>${label} (${n}mo)</span>`
-    )
+  const historyLegend = Object.entries(history)
+    .map(([l, n]) => `<span class="legend-item"><span class="legend-swatch state-${l.toLowerCase()}"></span>${l} (${n}mo)</span>`)
     .join("");
 
   return `
     <h2>Regime Dashboard</h2>
-    <div class="regime-box regime-${slug(regime.current_label || "neutral")}">
-      <div class="regime-label">CURRENT REGIME</div>
-      <div class="regime-value">${regime.current_label || "—"}</div>
-      <div class="regime-score">${regime.bullish_count} / ${regime.bullish_total} bullish</div>
+    <div class="regime-panel state-${label.toLowerCase()}">
+      <div class="regime-panel-top">
+        <div>
+          <div class="regime-label">Current regime</div>
+          <div class="regime-value">${label}</div>
+          <div class="regime-breakdown">${counts.bullish} bullish · ${counts.neutral} neutral · ${counts.bearish} bearish</div>
+        </div>
+        <div class="regime-tally" aria-label="${counts.bullish} of ${total} indicators bullish">
+          <span class="tally-n">${counts.bullish}</span><span class="tally-sep">/</span><span class="tally-total">${total}</span>
+          <span class="tally-word">bullish</span>
+        </div>
+      </div>
+      <div class="score-bar">${scoreBar}${unscoredSeg}</div>
     </div>
-    <div class="card-grid">${cardHTML}</div>
+    <div class="ind-grid">${REGIME_CARDS.map((cd) => indicatorCardHTML(cd, cards[cd.key])).join("")}</div>
+    <p class="ind-hint">Net score (bullish − bearish) of +3 or more = Bullish, −3 or less = Bearish. Click any indicator for its full history.</p>
     <h3>Regime History (trailing 36mo)</h3>
-    <div class="regime-bar">${barHTML}</div>
-    <div class="regime-legend">${legendHTML}</div>
+    <div class="regime-bar">${historyBar}</div>
+    <div class="regime-legend">${historyLegend}</div>
   `;
+}
+
+// ---------------------------------------------------------------- indicator pop-up
+
+let regimeHistoryPromise = null;
+
+function loadRegimeHistory() {
+  if (!regimeHistoryPromise) {
+    regimeHistoryPromise = fetch("data/regime_history.json", { cache: "no-store" }).then((res) => {
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.json();
+    });
+    regimeHistoryPromise.catch(() => { regimeHistoryPromise = null; }); // allow a retry
+  }
+  return regimeHistoryPromise;
+}
+
+function isoYearsBefore(isoDate, years) {
+  const [y, m, d] = isoDate.split("-");
+  return `${Number(y) - years}-${m}-${d}`;
+}
+
+function fredUrl(fred) {
+  return fred.includes(",")
+    ? `https://fred.stlouisfed.org/graph/?id=${fred}`
+    : `https://fred.stlouisfed.org/series/${fred}`;
+}
+
+function setupIndicatorModal(regime) {
+  const dialog = document.getElementById("ind-modal");
+  const fromInput = document.getElementById("ind-from");
+  const toInput = document.getElementById("ind-to");
+  const rangeButtons = [...dialog.querySelectorAll(".range-btns button")];
+  let active = null; // { cardDef, lines, firstDate, lastDate, recessions }
+  let lastRange = "10Y";
+
+  function draw(from, to) {
+    fromInput.value = from;
+    toInput.value = to;
+    renderIndicatorChart("ind-chart", active.lines, active.recessions, from, to);
+  }
+
+  function applyRange(range) {
+    lastRange = range;
+    rangeButtons.forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.range === range)));
+    const years = { "1Y": 1, "5Y": 5, "10Y": 10 }[range];
+    const from = years ? isoYearsBefore(active.lastDate, years) : active.firstDate;
+    draw(from < active.firstDate ? active.firstDate : from, active.lastDate);
+  }
+
+  function applyCustomRange() {
+    if (!fromInput.value || !toInput.value || fromInput.value >= toInput.value) return;
+    rangeButtons.forEach((b) => b.setAttribute("aria-pressed", "false"));
+    draw(fromInput.value, toInput.value);
+  }
+
+  async function open(key) {
+    const cd = REGIME_CARDS.find((c) => c.key === key);
+    const m = (regime.snapshot_cards || {})[key];
+    document.getElementById("ind-modal-title").textContent = cd.title;
+    document.getElementById("ind-modal-rule").textContent = m && m.rule ? m.rule : "";
+    const link = document.getElementById("ind-fred-link");
+    link.href = fredUrl(cd.fred);
+    link.textContent = `View ${cd.fred.replace(",", " & ")} on FRED ↗`;
+    const note = document.getElementById("ind-modal-note");
+    note.textContent = "Loading history…";
+    if (!dialog.open) dialog.showModal();
+
+    let hist;
+    try {
+      hist = await loadRegimeHistory();
+    } catch (e) {
+      note.textContent = `Could not load data/regime_history.json (${e.message}).`;
+      return;
+    }
+    const series = hist.series || {};
+    const lines = [{ label: cd.lineLabel || cd.label, data: series[key] || [], unit: cd.unit }];
+    (cd.extra || []).forEach((x) => lines.push({ label: x.label, data: series[x.key] || [], unit: cd.unit, secondary: true }));
+    const main = lines[0].data;
+    if (!main.length) {
+      note.textContent = "No history available for this indicator.";
+      return;
+    }
+    active = { cardDef: cd, lines, recessions: hist.recessions || [], firstDate: main[0][0], lastDate: main[main.length - 1][0] };
+    fromInput.min = toInput.min = active.firstDate;
+    fromInput.max = toInput.max = active.lastDate;
+    note.textContent = "Shaded areas indicate U.S. recessions (NBER). Source: FRED, Federal Reserve Bank of St. Louis.";
+    applyRange(lastRange);
+  }
+
+  rangeButtons.forEach((b) => b.addEventListener("click", () => active && applyRange(b.dataset.range)));
+  fromInput.addEventListener("change", applyCustomRange);
+  toInput.addEventListener("change", applyCustomRange);
+  dialog.querySelector(".ind-modal-close").addEventListener("click", () => dialog.close());
+  // A click on the backdrop lands on the <dialog> itself, not its inner wrapper.
+  dialog.addEventListener("click", (e) => { if (e.target === dialog) dialog.close(); });
+
+  document.getElementById("regime").addEventListener("click", (e) => {
+    const card = e.target.closest(".ind-card");
+    if (card) open(card.dataset.key);
+  });
 }
 
 function fmtPct(value) {
@@ -218,6 +350,7 @@ async function main() {
   for (const section of SECTIONS) {
     container.appendChild(renderSection(section, data));
   }
+  if (data.regime) setupIndicatorModal(data.regime);
 }
 
 main();
