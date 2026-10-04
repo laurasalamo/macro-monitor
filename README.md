@@ -64,6 +64,8 @@ data/data.json, meta.json   generated output the frontend reads
 - Adjust regime thresholds or lookback windows: named constants at the top of
   `scripts/regime_logic.py`.
 - Adjust staleness thresholds: `STALE_THRESHOLD_DAYS` in `scripts/series_config.py`.
+- After changing anything in `css/` or `js/`, bump the `?v=` version on their links in
+  `index.html` so browsers fetch the new files instead of cached ones.
 
 ## Momentum Composite
 
