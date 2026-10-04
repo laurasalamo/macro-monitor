@@ -445,7 +445,10 @@ function renderSection(section, data) {
   }
 
   if (section.kind === "curve") {
-    el.innerHTML = `<h2>${section.title}</h2><div class="chart-box"><canvas id="chart-${section.id}"></canvas></div>`;
+    const asOf = data.yield_curve && data.yield_curve.as_of;
+    const badge = asOf ? `<span class="month-badge">${fmtPeriod(asOf, "day")}</span>` : "";
+    el.innerHTML = `<div class="history-head"><h2>${section.title}</h2>${badge}</div>
+      <div class="chart-box"><canvas id="chart-${section.id}"></canvas></div>`;
     requestAnimationFrame(() => renderYieldCurveChart(`chart-${section.id}`, data.yield_curve));
     return el;
   }

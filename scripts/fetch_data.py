@@ -103,7 +103,7 @@ def fetch_gold(warnings):
 
 
 def fetch_yield_curve(api_key, warnings):
-    current, one_year_ago = [], []
+    current, one_year_ago, dates = [], [], []
     target = years_ago_iso(1)
     for label, fred_id in YIELD_CURVE_TENORS:
         try:
@@ -111,12 +111,13 @@ def fetch_yield_curve(api_key, warnings):
             if not parsed:
                 continue
             current.append([label, parsed[-1][1]])
+            dates.append(parsed[-1][0])
             past = tx.nearest_point(parsed, target)
             if past:
                 one_year_ago.append([label, past[1]])
         except Exception as e:
             warnings.append(f"yield_curve {label} ({fred_id}): {e}")
-    return current, one_year_ago
+    return current, one_year_ago, max(dates, default=None)
 
 
 def fetch_spread_2y3m(api_key, warnings):
@@ -293,7 +294,7 @@ def main():
     metrics["gold"] = fetch_gold(warnings)
 
     print("Fetching yield curve shape...")
-    curve_current, curve_1y_ago = fetch_yield_curve(api_key, warnings)
+    curve_current, curve_1y_ago, curve_as_of = fetch_yield_curve(api_key, warnings)
 
     print("Computing 2Y-3M spread (no premade FRED series)...")
     metrics["spread_2y3m"] = fetch_spread_2y3m(api_key, warnings)
@@ -354,6 +355,7 @@ def main():
         "yield_curve": {
             "current": curve_current,
             "one_year_ago": curve_1y_ago,
+            "as_of": curve_as_of,
         },
         "growth_labor": {
             "gdp_growth": metrics.get("gdp_growth"),

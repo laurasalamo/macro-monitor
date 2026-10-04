@@ -72,38 +72,82 @@ function renderBarChart(canvasId, items) {
   });
 }
 
+// Maturity of each tenor label, in years.
+function tenorYears(label) {
+  const n = parseFloat(label);
+  return label.endsWith("M") ? n / 12 : n;
+}
+
+// The x-axis is maturity on a square-root scale: true to the order and
+// relative distances of maturities, without squashing 1M-1Y into a sliver
+// next to 30Y.
 function renderYieldCurveChart(canvasId, yieldCurve) {
   const canvas = document.getElementById(canvasId);
   if (!canvas || !yieldCurve) return;
+  const css = getComputedStyle(document.documentElement);
+  const muted = css.getPropertyValue("--text-muted").trim();
+  const border = css.getPropertyValue("--border").trim();
 
-  const labels = (yieldCurve.current || []).map((p) => p[0]);
+  const points = (curve) => (curve || []).map(([label, y]) => ({ x: Math.sqrt(tenorYears(label)), y, label }));
+  const current = points(yieldCurve.current);
+  const labelAt = new Map(current.map((p) => [p.x, p.label]));
 
   new Chart(canvas.getContext("2d"), {
     type: "line",
     data: {
-      labels,
       datasets: [
         {
           label: "Current",
-          data: (yieldCurve.current || []).map((p) => p[1]),
-          borderColor: "#2563eb",
-          backgroundColor: "transparent",
-          pointRadius: 3,
+          data: current,
+          borderColor: "#3b82f6",
+          backgroundColor: "#3b82f6",
+          borderWidth: 2.5,
+          pointRadius: 4,
+          pointHoverRadius: 6,
         },
         {
-          label: "1 Year Ago",
-          data: (yieldCurve.one_year_ago || []).map((p) => p[1]),
+          label: "1Y Ago",
+          data: points(yieldCurve.one_year_ago),
           borderColor: "#9ca3af",
-          borderDash: [4, 4],
-          backgroundColor: "transparent",
-          pointRadius: 3,
+          borderDash: [5, 5],
+          borderWidth: 1.5,
+          pointRadius: 0,
+          pointHoverRadius: 4,
         },
       ],
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      plugins: { legend: { position: "bottom" } },
+      layout: { padding: { left: 6, right: 12 } },
+      datasets: { line: { clip: false, tension: 0 } }, // don't cut the end dots in half
+      scales: {
+        x: {
+          type: "linear",
+          min: current.length ? current[0].x : undefined,
+          max: current.length ? current[current.length - 1].x : undefined,
+          grid: { display: false },
+          border: { display: false },
+          // One tick per tenor, labelled with its name.
+          afterBuildTicks: (axis) => { axis.ticks = current.map((p) => ({ value: p.x })); },
+          ticks: { color: muted, autoSkip: true, autoSkipPadding: 6, maxRotation: 0, callback: (v) => labelAt.get(v) || "" },
+        },
+        y: {
+          grid: { color: border },
+          border: { display: false },
+          ticks: { color: muted, maxTicksLimit: 6, callback: (v) => `${v.toLocaleString(undefined, { maximumFractionDigits: 2 })}%` },
+        },
+      },
+      plugins: {
+        legend: { position: "top", align: "start", labels: { boxHeight: 0, boxWidth: 28, color: muted } },
+        tooltip: {
+          callbacks: {
+            title: (items) => items[0].raw.label,
+            label: (c) => `${c.dataset.label}: ${c.parsed.y.toFixed(2)}%`,
+          },
+        },
+      },
+      interaction: { mode: "nearest", intersect: false, axis: "x" },
     },
   });
 }
