@@ -24,9 +24,9 @@ from gold_client import GoldFetchError, get_gold_series
 from momentum_client import MomentumFetchError, get_ohlcv_series
 from momentum_config import UNIVERSE as MOMENTUM_UNIVERSE
 from series_config import (
+    CHART_DAILY_YEARS,
     CHART_HISTORY_KEYS,
     FRED_SERIES,
-    HISTORY_YEARS,
     REGIME_HISTORY_DAILY_YEARS,
     SCALE,
     STALE_THRESHOLD_DAYS,
@@ -180,11 +180,12 @@ def without_history(metric):
     return {k: v for k, v in metric.items() if k != "history"}
 
 
-def with_trimmed_history(metric, years):
+def with_chart_history(metric, daily_years):
+    """Full history, with points older than daily_years thinned to one per week."""
     if not metric:
         return metric
-    start = years_ago_iso(years)
-    return {**metric, "history": [p for p in metric["history"] if p[0] >= start]}
+    cutoff = years_ago_iso(daily_years)
+    return {**metric, "history": [list(p) for p in tx.thin_to_weekly_before(metric["history"], cutoff)]}
 
 
 def build_regime_section(metrics):
@@ -323,7 +324,7 @@ def main():
     # History is only needed in data.json for charted metrics; drop it
     # everywhere else to keep the daily-committed file small.
     metrics = {
-        k: with_trimmed_history(m, HISTORY_YEARS.get(k, HISTORY_YEARS["default"]))
+        k: with_chart_history(m, CHART_DAILY_YEARS)
         if k in CHART_HISTORY_KEYS else without_history(m)
         for k, m in metrics.items()
     }
@@ -374,6 +375,7 @@ def main():
         },
         "treasury_spreads": {
             "y2": metrics.get("y2"),
+            "y5": metrics.get("y5"),
             "m3": metrics.get("m3"),
             "y10": metrics.get("y10"),
             "spread_2y3m": metrics.get("spread_2y3m"),

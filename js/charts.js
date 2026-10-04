@@ -4,9 +4,10 @@
 const CHART_COLORS = ["#2563eb", "#dc2626", "#d97706", "#16a34a", "#7c3aed", "#0891b2"];
 
 // `from`/`to` (ISO dates, optional) limit the chart to a window; only points
-// inside it are plotted so the y-axis fits the visible range. Re-rendering the
+// inside it are plotted so the y-axis fits the visible range. `hideLegend` is
+// for charts whose toggle chips already act as the legend. Re-rendering the
 // same canvas replaces its chart.
-function renderLineChart(canvasId, seriesDefs, data, from, to) {
+function renderLineChart(canvasId, seriesDefs, data, from, to, hideLegend) {
   const canvas = document.getElementById(canvasId);
   if (!canvas) return;
   const existing = Chart.getChart(canvas);
@@ -22,6 +23,7 @@ function renderLineChart(canvasId, seriesDefs, data, from, to) {
       borderColor: s.color || CHART_COLORS[i % CHART_COLORS.length],
       backgroundColor: "transparent",
       borderWidth: 1.5,
+      borderDash: s.dashed ? [6, 4] : [],
       pointRadius: 0,
       tension: 0.15,
     };
@@ -40,7 +42,7 @@ function renderLineChart(canvasId, seriesDefs, data, from, to) {
           : { type: "time", time: { unit: "month" }, ticks: { maxRotation: 0 } },
         y: { beginAtZero: false },
       },
-      plugins: { legend: { position: "bottom" } },
+      plugins: { legend: { display: !hideLegend, position: "bottom" } },
       interaction: { mode: "nearest", intersect: false },
     },
   });

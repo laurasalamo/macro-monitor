@@ -24,6 +24,9 @@ const REGIME_CARDS = [
     lineLabel: "4-week average", extra: [{ key: "initial_claims", label: "Weekly" }] },
 ];
 
+// Time-range buttons for section charts (see setupChartControls in app.js).
+const STANDARD_RANGES = ["1Y", "2Y", "5Y", "10Y", "Max"];
+
 const SECTIONS = [
   { id: "regime", title: "Regime Dashboard", kind: "regime" },
 
@@ -42,6 +45,7 @@ const SECTIONS = [
       // Range buttons above the chart; "Max" is everything data.json has.
       ranges: ["3M", "6M", "1Y", "2Y", "Max"],
       defaultRange: "Max",
+      toggles: true,
       note: "FRED publishes only the last 3 years of ICE BofA spread data.",
       series: [
         { path: "credit_spreads.hy_oas", label: "HY OAS", color: "#dc2626" },
@@ -55,22 +59,33 @@ const SECTIONS = [
     id: "inflation",
     title: "Inflation Expectations",
     description:
-      "Market-implied inflation (breakevens), the 5Y TIPS real yield, and Core PCE — what the Fed actually targets.",
+      "Nominal Treasury yield ≈ breakeven (market-implied inflation) + TIPS real yield, for 5Y and 10Y, plus the 5Y5Y forward and Core PCE — the underlying inflation the Fed targets.",
+    cardColumns: 4, // one row of 5Y measures, one of 10Y
     cards: [
+      { label: "5Y Treasury", path: "treasury_spreads.y5", unit: "%" },
       { label: "5Y Breakeven", path: "inflation.breakeven_5y", unit: "%" },
-      { label: "10Y Breakeven", path: "inflation.breakeven_10y", unit: "%" },
-      { label: "5Y5Y Forward", path: "inflation.forward_5y5y", unit: "%" },
-      { label: "10Y Real Rate", path: "inflation.real_10y", unit: "%" },
       { label: "5Y TIPS Yield", path: "inflation.tips_5y", unit: "%" },
+      { label: "5Y5Y Forward", path: "inflation.forward_5y5y", unit: "%" },
+      { label: "10Y Treasury", path: "treasury_spreads.y10", unit: "%" },
+      { label: "10Y Breakeven", path: "inflation.breakeven_10y", unit: "%" },
+      { label: "10Y TIPS Yield", path: "inflation.real_10y", unit: "%" },
       { label: "Core PCE YoY", path: "inflation.core_pce_yoy", unit: "%" },
     ],
     chart: {
-      title: "Breakevens, 5Y TIPS Yield & 5Y5Y Forward",
+      title: "Nominal Yields, Breakevens, TIPS Yields & Core PCE",
+      ranges: STANDARD_RANGES,
+      defaultRange: "5Y",
+      toggles: true,
+      note: "Color = measure; dashed = 10Y. Click a label to show or hide its line.",
       series: [
-        { path: "inflation.breakeven_5y", label: "5Y BE", color: "#2563eb" },
-        { path: "inflation.breakeven_10y", label: "10Y BE", color: "#16a34a" },
-        { path: "inflation.forward_5y5y", label: "5Y5Y Fwd", color: "#d97706" },
+        { path: "treasury_spreads.y5", label: "5Y Nominal", color: "#2563eb" },
+        { path: "treasury_spreads.y10", label: "10Y Nominal", color: "#2563eb", dashed: true },
+        { path: "inflation.breakeven_5y", label: "5Y BE", color: "#16a34a" },
+        { path: "inflation.breakeven_10y", label: "10Y BE", color: "#16a34a", dashed: true },
         { path: "inflation.tips_5y", label: "5Y TIPS", color: "#7c3aed" },
+        { path: "inflation.real_10y", label: "10Y TIPS", color: "#7c3aed", dashed: true },
+        { path: "inflation.forward_5y5y", label: "5Y5Y Fwd", color: "#d97706" },
+        { path: "inflation.core_pce_yoy", label: "Core PCE", color: "#dc2626" },
       ],
     },
   },
@@ -87,7 +102,9 @@ const SECTIONS = [
       { label: "M2", path: "liquidity.m2", unit: "T$" },
     ],
     chart: {
-      title: "NFCI — 5Y",
+      title: "NFCI",
+      ranges: STANDARD_RANGES,
+      defaultRange: "5Y",
       series: [{ path: "liquidity.nfci", label: "NFCI", color: "#4f46e5" }],
     },
   },
@@ -107,7 +124,9 @@ const SECTIONS = [
       { label: "Labor Force Part.", path: "growth_labor.participation", unit: "%" },
     ],
     chart: {
-      title: "Unemployment Rate (2Y)",
+      title: "Unemployment Rate",
+      ranges: STANDARD_RANGES,
+      defaultRange: "2Y",
       series: [{ path: "growth_labor.unemployment", label: "Unemployment", color: "#2563eb" }],
     },
     barChart: {
@@ -142,15 +161,20 @@ const SECTIONS = [
   {
     id: "treasury",
     title: "Treasury Spreads",
+    cardColumns: 3,
     cards: [
       { label: "2Y Treasury", path: "treasury_spreads.y2", unit: "%" },
       { label: "3M Treasury", path: "treasury_spreads.m3", unit: "%" },
+      { label: "5Y Treasury", path: "treasury_spreads.y5", unit: "%" },
       { label: "10Y Treasury", path: "treasury_spreads.y10", unit: "%" },
       { label: "2Y-3M Spread", path: "treasury_spreads.spread_2y3m", unit: "pp" },
       { label: "10Y-2Y Spread", path: "treasury_spreads.spread_10y2y", unit: "pp" },
     ],
     chart: {
       title: "Treasury Yields: 10Y vs 2Y",
+      ranges: STANDARD_RANGES,
+      defaultRange: "5Y",
+      toggles: true,
       series: [
         { path: "treasury_spreads.y10", label: "10Y Treasury", color: "#2563eb" },
         { path: "treasury_spreads.y2", label: "2Y Treasury", color: "#d97706" },

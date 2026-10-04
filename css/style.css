@@ -100,7 +100,8 @@ main {
 
 .card-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  /* --card-cols caps the cards per row (12px = the gap). */
+  grid-template-columns: repeat(auto-fit, minmax(max(150px, calc((100% - (var(--card-cols, 99) - 1) * 12px) / var(--card-cols, 99))), 1fr));
   gap: 12px;
   margin-bottom: 16px;
 }
@@ -164,6 +165,41 @@ main {
   margin: 10px 0 4px;
   font-size: 0.82rem;
 }
+
+.series-toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0 0;
+}
+
+.series-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font: inherit;
+  font-size: 0.8rem;
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--card-bg);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.series-toggle[aria-pressed="false"] {
+  color: var(--text-muted);
+  opacity: 0.5;
+}
+
+.series-toggle[aria-pressed="false"] .swatch { border-top-color: var(--text-muted); }
+
+.swatch {
+  width: 18px;
+  border-top: 3px solid var(--swatch);
+}
+
+.swatch.dashed { border-top-style: dashed; }
 
 .chart-note {
   margin: 6px 0 0;

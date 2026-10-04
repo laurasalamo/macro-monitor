@@ -29,6 +29,7 @@ FRED_SERIES = {
 
     "spread_10y2y":     ("T10Y2Y",          "level",      "pp", "daily"),
     "y2":               ("DGS2",            "level",      "%",  "daily"),
+    "y5":               ("DGS5",            "level",      "%",  "daily"),
     "m3":               ("DGS3MO",          "level",      "%",  "daily"),
     "y10":              ("DGS10",           "level",      "%",  "daily"),
 
@@ -88,17 +89,16 @@ STALE_THRESHOLD_DAYS = {
 # with the `chart.series` paths in js/config.js.
 CHART_HISTORY_KEYS = {
     "hy_oas", "ig_oas", "em_corp_oas",
-    "breakeven_5y", "breakeven_10y", "forward_5y5y", "tips_5y",
+    "breakeven_5y", "breakeven_10y", "forward_5y5y", "real_10y", "tips_5y", "core_pce_yoy",
     "nfci",
     "unemployment",
-    "y10", "y2",
+    "y10", "y5", "y2",
 }
 
-# Years of history to keep in data.json per charted metric (default 5, override per key).
-HISTORY_YEARS = {
-    "default": 5,
-    "unemployment": 2,
-}
+# Charted metrics ship their full history so the range buttons can reach back
+# to "Max"; daily/weekly points older than this many years are thinned to one
+# per week to keep data.json small.
+CHART_DAILY_YEARS = 5
 
 # Regime pop-up charts: daily series older than this many years are thinned to
 # one point per week to keep data/regime_history.json small.

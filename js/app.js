@@ -292,64 +292,105 @@ function renderMomentumSection(section, momentum) {
   return html;
 }
 
-// ---------------------------------------------------------------- section chart ranges
+// ---------------------------------------------------------------- section chart controls
 
 const RANGE_MONTHS = { "3M": 3, "6M": 6, "1Y": 12, "2Y": 24, "5Y": 60, "10Y": 120 };
 
-function chartRangeControlsHTML(section) {
-  const id = section.id;
-  return `
+function chartControlsHTML(section) {
+  const { id, chart } = section;
+  let html = "";
+  if (chart.toggles) {
+    html += `
+    <div class="series-toggles" role="group" aria-label="Lines shown">
+      ${chart.series.map((s, i) => `
+        <button type="button" class="series-toggle" data-index="${i}" aria-pressed="true">
+          <span class="swatch${s.dashed ? " dashed" : ""}" style="--swatch:${s.color}"></span>${s.label}
+        </button>`).join("")}
+    </div>`;
+  }
+  if (chart.ranges) {
+    html += `
     <div class="chart-controls">
       <div class="range-btns" role="group" aria-label="Time range">
-        ${section.chart.ranges.map((r) => `<button type="button" data-range="${r}">${r}</button>`).join("")}
+        ${chart.ranges.map((r) => `<button type="button" data-range="${r}">${r}</button>`).join("")}
       </div>
       <div class="date-range">
         <label for="${id}-from">From</label><input type="date" id="${id}-from">
         <label for="${id}-to">to</label><input type="date" id="${id}-to">
       </div>
     </div>`;
+  }
+  return html;
 }
 
-// Wires a section's range buttons and date inputs to its line chart. The full
-// span is the union of every series' history.
-function setupChartRanges(el, section, data) {
+// Wires a section's range buttons, date inputs and line toggles to its chart.
+// Preset ranges are measured over the lines currently shown, so "Max" starts
+// where the longest visible series starts.
+function setupChartControls(el, section, data) {
+  const { chart } = section;
   const canvasId = `chart-${section.id}`;
   const fromInput = el.querySelector(`#${section.id}-from`);
   const toInput = el.querySelector(`#${section.id}-to`);
-  const buttons = [...el.querySelectorAll(".range-btns button")];
-  const dates = section.chart.series.flatMap((s) => ((getPath(data, s.path) || {}).history || []).map(([d]) => d)).sort();
-  if (!dates.length) {
-    renderLineChart(canvasId, section.chart.series, data);
-    return;
-  }
-  const firstDate = dates[0];
-  const lastDate = dates[dates.length - 1];
-  fromInput.min = toInput.min = firstDate;
-  fromInput.max = toInput.max = lastDate;
+  const rangeButtons = [...el.querySelectorAll(".range-btns button")];
+  const toggleButtons = [...el.querySelectorAll(".series-toggle")];
+  const shown = new Set(chart.series.map((_, i) => i));
+  const historyOf = (s) => (getPath(data, s.path) || {}).history || [];
+  const span = (series) => {
+    const dates = series.flatMap((s) => historyOf(s).map(([d]) => d)).sort();
+    return dates.length ? [dates[0], dates[dates.length - 1]] : [null, null];
+  };
+  const [allFirst, allLast] = span(chart.series);
+  let from = null;
+  let to = null;
+  let activeRange = null; // null while a custom date range is showing
 
-  function draw(from, to) {
-    fromInput.value = from;
-    toInput.value = to;
-    renderLineChart(canvasId, section.chart.series, data, from, to);
+  function draw() {
+    if (fromInput) {
+      fromInput.value = from || "";
+      toInput.value = to || "";
+    }
+    const visible = chart.series.filter((_, i) => shown.has(i));
+    renderLineChart(canvasId, visible, data, from, to, Boolean(chart.toggles));
   }
 
   function applyRange(range) {
-    buttons.forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.range === range)));
+    activeRange = range;
+    rangeButtons.forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.range === range)));
+    let [firstDate, lastDate] = span(chart.series.filter((_, i) => shown.has(i)));
+    if (!firstDate) [firstDate, lastDate] = [allFirst, allLast];
     const months = RANGE_MONTHS[range];
-    const from = months ? isoMonthsBefore(lastDate, months) : firstDate;
-    draw(from < firstDate ? firstDate : from, lastDate);
+    const start = months ? isoMonthsBefore(lastDate, months) : firstDate;
+    from = start < firstDate ? firstDate : start;
+    to = lastDate;
+    draw();
   }
 
   function applyCustomRange() {
     if (!fromInput.value || !toInput.value || fromInput.value >= toInput.value) return;
-    buttons.forEach((b) => b.setAttribute("aria-pressed", "false"));
-    draw(fromInput.value, toInput.value);
+    activeRange = null;
+    rangeButtons.forEach((b) => b.setAttribute("aria-pressed", "false"));
+    from = fromInput.value;
+    to = toInput.value;
+    draw();
   }
 
-  buttons.forEach((b) => b.addEventListener("click", () => applyRange(b.dataset.range)));
-  fromInput.addEventListener("change", applyCustomRange);
-  toInput.addEventListener("change", applyCustomRange);
-  applyRange(section.chart.defaultRange || section.chart.ranges[section.chart.ranges.length - 1]);
+  toggleButtons.forEach((b) => b.addEventListener("click", () => {
+    const i = Number(b.dataset.index);
+    if (shown.has(i)) shown.delete(i); else shown.add(i);
+    b.setAttribute("aria-pressed", String(shown.has(i)));
+    if (activeRange) applyRange(activeRange); else draw();
+  }));
+
+  if (chart.ranges && allFirst) {
+    fromInput.min = toInput.min = allFirst;
+    fromInput.max = toInput.max = allLast;
+    rangeButtons.forEach((b) => b.addEventListener("click", () => applyRange(b.dataset.range)));
+    fromInput.addEventListener("change", applyCustomRange);
+    toInput.addEventListener("change", applyCustomRange);
+    applyRange(chart.defaultRange || chart.ranges[chart.ranges.length - 1]);
+  } else {
+    draw();
+  }
 }
 
 function renderSection(section, data) {
@@ -379,10 +420,11 @@ function renderSection(section, data) {
   let html = `<h2>${section.title}</h2>`;
   if (section.description) html += `<p class="section-desc">${section.description}</p>`;
   if (section.cards) {
-    html += `<div class="card-grid">${section.cards.map((c) => statCardHTML(c, data)).join("")}</div>`;
+    const cols = section.cardColumns ? ` style="--card-cols:${section.cardColumns}"` : "";
+    html += `<div class="card-grid"${cols}>${section.cards.map((c) => statCardHTML(c, data)).join("")}</div>`;
   }
-  if (section.chart && section.chart.ranges) {
-    html += `<h3 class="chart-title">${section.chart.title}</h3>${chartRangeControlsHTML(section)}`;
+  if (section.chart && (section.chart.ranges || section.chart.toggles)) {
+    html += `<h3 class="chart-title">${section.chart.title}</h3>${chartControlsHTML(section)}`;
     html += `<div class="chart-box"><canvas id="chart-${section.id}"></canvas></div>`;
     if (section.chart.note) html += `<p class="chart-note">${section.chart.note}</p>`;
   } else if (section.chart) {
@@ -393,8 +435,8 @@ function renderSection(section, data) {
   }
   el.innerHTML = html;
 
-  if (section.chart && section.chart.ranges) {
-    requestAnimationFrame(() => setupChartRanges(el, section, data));
+  if (section.chart && (section.chart.ranges || section.chart.toggles)) {
+    requestAnimationFrame(() => setupChartControls(el, section, data));
   } else if (section.chart) {
     requestAnimationFrame(() => renderLineChart(`chart-${section.id}`, section.chart.series, data));
   }
