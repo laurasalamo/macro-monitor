@@ -51,9 +51,10 @@ def test_apply_level_identity_returns_copy():
 
 def test_apply_level_scales():
     s = [("2024-01-01", 1500.0), ("2024-01-02", -250.0)]
-    assert tx.apply_level(s, scale=0.001) == pytest.approx(
-        [("2024-01-01", 1.5), ("2024-01-02", -0.25)]
-    )
+    assert tx.apply_level(s, scale=0.001) == [
+        ("2024-01-01", pytest.approx(1.5)),
+        ("2024-01-02", pytest.approx(-0.25)),
+    ]
 
 
 # ---------------------------------------------------------------- yoy
