@@ -1,7 +1,8 @@
 """Classic market-breadth indicators computed from the S&P 500 members' daily
 OHLCV (Yahoo Finance): A/D line, net advances, McClellan Oscillator,
-Summation Index / RASI, new highs & lows, % above moving averages, High-Low
-Index and up-volume share.
+Summation Index / RASI, normalized A/D line (ADn), new highs & lows, % above
+moving averages, % of stocks near their 52-week highs / lows and up/down
+volume ratios.
 
 The originals are published for the NYSE (all ~2,800 issues), but free daily
 NYSE advance/decline data doesn't exist, so the same formulas run on the 500
@@ -14,8 +15,10 @@ from collections import deque
 MIN_COVERAGE = 0.9   # need 90% of members with a close today and yesterday
 HL_DAYS = 252        # 52-week window for new highs / lows
 AD_MA_DAYS = 100     # moving average drawn on the A/D line
-SMOOTH_DAYS = 10     # short average for noisy daily series
 MA_SET = (20, 50, 200)
+ADN_DAYS = 30        # look-back for the normalized A/D line
+ADN_SMOOTH = 5       # smoothing of the normalized A/D line
+NEAR_PCT = 5         # "near" a 52-week high / low = within this many percent
 
 
 # ------------------------------------------------------------------ helpers
@@ -55,6 +58,26 @@ def cumsum(values, start=0.0):
     return out
 
 
+def stochastic(values, n):
+    """Where each value sits in the range of the last n values, 0-100
+    (50 if the range is flat). None until n values are available."""
+    out, window = [], deque()
+    for v in values:
+        if v is None:
+            out.append(None)
+            window.clear()
+            continue
+        window.append(v)
+        if len(window) > n:
+            window.popleft()
+        if len(window) < n:
+            out.append(None)
+            continue
+        lo, hi = min(window), max(window)
+        out.append(50.0 if hi == lo else 100.0 * (v - lo) / (hi - lo))
+    return out
+
+
 def _r(v, nd=2):
     return None if v is None else round(v, nd)
 
@@ -77,6 +100,8 @@ def daily_counts(dates, close, high, low, volume, min_coverage=MIN_COVERAGE):
     down_vol = [0.0] * n_days
     nh = [0] * n_days
     nl = [0] * n_days
+    near_hi = [0] * n_days
+    near_lo = [0] * n_days
     hl_seen = [0] * n_days
     above = {n: [0] * n_days for n in MA_SET}
     ma_seen = {n: [0] * n_days for n in MA_SET}
@@ -137,6 +162,11 @@ def daily_counts(dates, close, high, low, volume, min_coverage=MIN_COVERAGE):
                     nh[i] += 1
                 if lo_q[0][0] == i:
                     nl[i] += 1
+                ref = ci if ci is not None else (hi_v + lo_v) / 2
+                if ref >= hi_q[0][1] * (1 - NEAR_PCT / 100):
+                    near_hi[i] += 1
+                if ref <= lo_q[0][1] * (1 + NEAR_PCT / 100):
+                    near_lo[i] += 1
 
     need = min_coverage * universe
     ok = [seen[i] >= need and seen[i] > 0 for i in range(n_days)]
@@ -149,6 +179,8 @@ def daily_counts(dates, close, high, low, volume, min_coverage=MIN_COVERAGE):
         "down_vol": [down_vol[i] if ok[i] else None for i in range(n_days)],
         "nh": [nh[i] if hl_ok[i] else None for i in range(n_days)],
         "nl": [nl[i] if hl_ok[i] else None for i in range(n_days)],
+        "near_hi": [100.0 * near_hi[i] / hl_seen[i] if hl_ok[i] and hl_seen[i] else None for i in range(n_days)],
+        "near_lo": [100.0 * near_lo[i] / hl_seen[i] if hl_ok[i] and hl_seen[i] else None for i in range(n_days)],
         "pct_above": {
             n: [100.0 * above[n][i] / ma_seen[n][i] if ma_seen[n][i] >= need else None for i in range(n_days)]
             for n in MA_SET
@@ -166,9 +198,9 @@ TEXT = {
         "unit": "",
     },
     "adn": {
-        "label": "Net Advances (ADn)",
-        "theory": "Daily advances minus declines, ratio-adjusted: (advances − declines) ÷ (advances + declines) × 1,000. Normalizing by the number of stocks traded makes readings comparable over time and across markets. It is the raw input to the McClellan Oscillator and the Summation Index.",
-        "interpretation": "Each bar is one day's breadth. Readings above +800 or below −800 mean nearly every stock moved the same way (a thrust day). Strings of positive bars confirm a healthy rally; heavy negative days clustered together often mark capitulation near lows.",
+        "label": "ADn Line",
+        "theory": f"The normalized A/D line: where today's advance/decline line sits within its own range of the last {ADN_DAYS} trading days, on a 0–100 scale (0 = the lowest point of the period, 100 = the highest), smoothed over {ADN_SMOOTH} days. It turns the open-ended A/D line into a bounded oscillator.",
+        "interpretation": "Above 80 breadth is overbought: the A/D line is near the top of its recent range and the advance is stretched. Below 20 it is oversold, and turns up from there often mark short-term lows. Crossing 50 shows which side, advancers or decliners, has taken control. Long stays near 0 or 100 mean a strong trend rather than an imminent reversal.",
         "unit": "",
     },
     "summation": {
@@ -185,8 +217,8 @@ TEXT = {
     },
     "new_highs_lows": {
         "label": "New Highs & Lows",
-        "theory": "The number of stocks hitting a new 52-week high (green, up) and a new 52-week low (red, down) each day, based on intraday highs and lows. The line is the net (highs − lows), averaged over 10 days.",
-        "interpretation": "In a healthy uptrend new highs clearly outnumber new lows. Rising new lows while the index is near its highs is a sign of internal weakness. A spike in new lows usually comes with sell-offs, and its fading tends to signal that the selling is exhausted.",
+        "theory": "The number of stocks hitting a new 52-week high (green) and a new 52-week low (red) each day, based on intraday highs and lows. Both are drawn from zero on top of each other, so the larger of the two stands out.",
+        "interpretation": "In a healthy uptrend green clearly dominates. Red expanding while the index is near its highs is a sign of internal weakness. Spikes in new lows come with sell-offs, and their fading tends to signal that the selling is exhausted.",
         "unit": "",
     },
     "pct_above_ma": {
@@ -196,16 +228,16 @@ TEXT = {
         "unit": "%",
     },
     "pct_highs_lows": {
-        "label": "% at Highs vs Lows",
-        "theory": "The High-Low Index: new 52-week highs as a percentage of new highs plus new lows, NH ÷ (NH + NL) × 100, averaged over 10 days. Days with no new highs or lows don't change the average.",
-        "interpretation": "Above 50% more stocks are making new highs than new lows; below 50%, the reverse. Above 70% indicates a strong uptrend, below 30% a strong downtrend. A move from below 30% to above 50% often confirms that a correction has ended.",
+        "label": f"% Within {NEAR_PCT}% of Highs & Lows",
+        "theory": f"The percentage of stocks closing within {NEAR_PCT}% of their 52-week high (green) and within {NEAR_PCT}% of their 52-week low (red). Unlike new highs and lows, which count only the stocks setting a record that very day, this shows how many are close to one.",
+        "interpretation": "Green above 30% means a large share of the market is trading near its highs: a broad, healthy uptrend. When green falls and red rises the market is weakening underneath, and a crossover (red above green) marks a broad downtrend. Green turning up while the index is still falling is an early sign of recovery.",
         "unit": "%",
     },
     "volume": {
-        "label": "Volume",
-        "theory": "The share of total volume traded in advancing stocks: up volume ÷ (up volume + down volume) × 100. It weighs breadth by how much money is moving, not just by how many stocks.",
-        "interpretation": "Days above 90% (90% up days) show heavy, broad buying; days below 10% (90% down days) show panic selling. Clusters of 90% down days often precede lows, and a 90% up day after a decline is a classic sign that buyers are returning. The 10-day average shows the trend of buying pressure.",
-        "unit": "%",
+        "label": "Volume Ratios",
+        "theory": "Up volume (shares traded in rising stocks) divided by down volume (shares traded in falling stocks), in blue, and its inverse, down ÷ up volume, in orange. A reading of 2 means twice as much volume went into one side as into the other.",
+        "interpretation": "Peaks above about 4 show one-sided days: heavy, broad buying (blue) or selling (orange). Readings of 9 or more are the classic 90% up / 90% down days. Clusters of orange spikes often precede lows, and a strong blue spike after a decline is a classic sign that buyers are returning.",
+        "unit": "",
     },
 }
 
@@ -240,21 +272,14 @@ def build_indicators(dates, counts, index_closes=None, index_name="S&P 500"):
     rasi = [None if f is None else 19 * s_ - 9 * f for f, s_ in zip(fast, slow)]
     summ = [None if f is None else 19 * s_ - 9 * f for f, s_ in zip(raw_fast, raw_slow)]
 
+    adn = sma(stochastic(ad_line, ADN_DAYS), ADN_SMOOTH)
+
     nh, nl = cut(counts["nh"]), cut(counts["nl"])
-    net_hl = sma([None if h is None else h - l for h, l in zip(nh, nl)], SMOOTH_DAYS)
-    hl_pct_daily, last_pct = [], None
-    for h, l in zip(nh, nl):
-        if h is None:
-            hl_pct_daily.append(None)
-            continue
-        if h + l:
-            last_pct = 100.0 * h / (h + l)
-        hl_pct_daily.append(last_pct)  # no highs or lows today: carry the last ratio
-    hl_index = sma(hl_pct_daily, SMOOTH_DAYS)
+    near_hi, near_lo = cut(counts["near_hi"]), cut(counts["near_lo"])
 
     up, down = cut(counts["up_vol"]), cut(counts["down_vol"])
-    up_pct = [None if u is None or (u + v) == 0 else 100.0 * u / (u + v) for u, v in zip(up, down)]
-    up_pct_ma = sma(up_pct, SMOOTH_DAYS)
+    up_down = [None if u is None or not v else u / v for u, v in zip(up, down)]
+    down_up = [None if u is None or not u else v / u for u, v in zip(up, down)]
 
     pct = {n: cut(counts["pct_above"][n]) for n in MA_SET}
 
@@ -280,12 +305,12 @@ def build_indicators(dates, counts, index_closes=None, index_name="S&P 500"):
         },
         "adn": {
             "lines": [
-                {"label": "Net advances (ratio-adjusted)", "type": "bar", "sign_colors": True, "data": _series(d, rana, 1)},
-                {"label": f"{SMOOTH_DAYS}-day average", "type": "line", "data": _series(d, sma(rana, SMOOTH_DAYS), 1)},
+                {"label": "ADn line", "type": "line", "color": "neutral", "data": _series(d, adn, 1)},
             ],
-            "refs": [0],
-            "latest": last(rana),
-            "latest_text": f"{last(rana):+.0f} ({adv[-1] if adv[-1] is not None else '—'} up, {dec[-1] if dec[-1] is not None else '—'} down)",
+            "refs": [{"value": 80, "tone": "up"}, {"value": 50, "tone": "neutral"}, {"value": 20, "tone": "down"}],
+            "range": [0, 100],
+            "latest": last(adn),
+            "latest_text": f"{last(adn):.0f}" if last(adn) is not None else "—",
         },
         "summation": {
             "lines": [
@@ -306,13 +331,12 @@ def build_indicators(dates, counts, index_closes=None, index_name="S&P 500"):
         },
         "new_highs_lows": {
             "lines": [
-                {"label": "New 52-week highs", "type": "bar", "color": "up", "data": _series(d, nh, 0)},
-                {"label": "New 52-week lows", "type": "bar", "color": "down", "data": _series(d, [None if v is None else -v for v in nl], 0)},
-                {"label": f"Net highs − lows, {SMOOTH_DAYS}-day avg", "type": "line", "data": _series(d, net_hl, 1)},
+                {"label": "New 52-week lows", "type": "area", "color": "down", "data": _series(d, nl, 0)},
+                {"label": "New 52-week highs", "type": "area", "color": "up", "data": _series(d, nh, 0)},
             ],
-            "refs": [0],
+            "refs": [],
             "latest": last(nh),
-            "latest_text": f"{last(nh) if last(nh) is not None else '—'} highs / {last(nl) if last(nl) is not None else '—'} lows",
+            "latest_text": f"{last(nh) if last(nh) is not None else '—'}/{last(nl) if last(nl) is not None else '—'} (highs/lows)",
         },
         "pct_above_ma": {
             "lines": [
@@ -325,22 +349,21 @@ def build_indicators(dates, counts, index_closes=None, index_name="S&P 500"):
         },
         "pct_highs_lows": {
             "lines": [
-                {"label": f"High-Low Index ({SMOOTH_DAYS}-day avg)", "type": "line", "data": _series(d, hl_index, 1)},
+                {"label": f"Within {NEAR_PCT}% of 52-week high", "type": "line", "color": "up", "data": _series(d, near_hi, 1)},
+                {"label": f"Within {NEAR_PCT}% of 52-week low", "type": "line", "color": "down", "data": _series(d, near_lo, 1)},
             ],
-            "refs": [50, 70, 30],
-            "range": [0, 100],
-            "latest": last(hl_index),
-            "latest_text": f"{last(hl_index):.0f}%" if last(hl_index) is not None else "—",
+            "refs": [{"value": 30, "tone": "up"}],
+            "latest": last(near_hi),
+            "latest_text": f"{last(near_hi):.0f}%/{last(near_lo):.0f}% (near highs/lows)" if last(near_hi) is not None else "—",
         },
         "volume": {
             "lines": [
-                {"label": "Up volume share", "type": "bar", "color": "neutral", "extreme": [10, 90], "data": _series(d, up_pct, 1)},
-                {"label": f"{SMOOTH_DAYS}-day average", "type": "line", "data": _series(d, up_pct_ma, 1)},
+                {"label": "Up volume ÷ down volume", "type": "area", "color": "blue", "data": _series(d, up_down, 2)},
+                {"label": "Down volume ÷ up volume", "type": "area", "color": "orange", "data": _series(d, down_up, 2)},
             ],
-            "refs": [50, 90, 10],
-            "range": [0, 100],
-            "latest": last(up_pct),
-            "latest_text": f"{last(up_pct):.0f}% of volume in rising stocks" if last(up_pct) is not None else "—",
+            "refs": [],
+            "latest": last(up_down),
+            "latest_text": f"{last(up_down):.1f}/{last(down_up):.1f} (up/down)" if last(up_down) is not None and last(down_up) is not None else "—",
         },
     }
 

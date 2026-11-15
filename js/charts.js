@@ -269,6 +269,21 @@ const referenceLines = {
       ctx.moveTo(area.left, py);
       ctx.lineTo(area.right, py);
       ctx.stroke();
+      if (line.label) {
+        // Value pill at the left edge, e.g. a green "80" on an overbought line.
+        ctx.setLineDash([]);
+        ctx.font = "600 11px system-ui, -apple-system, sans-serif";
+        const w = ctx.measureText(line.label).width + 10;
+        const h = 18;
+        ctx.fillStyle = line.color;
+        ctx.beginPath();
+        ctx.roundRect(area.left + 6, py - h / 2, w, h, 4);
+        ctx.fill();
+        ctx.fillStyle = "#fff";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(line.label, area.left + 6 + w / 2, py + 0.5);
+      }
     }
     ctx.restore();
   },

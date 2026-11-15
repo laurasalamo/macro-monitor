@@ -6,6 +6,9 @@
 const BI_RANGES = { "1M": 1, "6M": 6, "1Y": 12, "All": null };
 const BI_STORAGE_KEY = "bi-selected";
 const BI_LINE_COLORS = ["#2563eb", "#d97706", "#7c3aed"];
+const BI_NEUTRAL = "#78716c";
+// Named colors an indicator line can ask for.
+const biColor = (name) => ({ up: UP_COLOR, down: DOWN_COLOR, neutral: BI_NEUTRAL, blue: BI_LINE_COLORS[0], orange: BI_LINE_COLORS[1] }[name]);
 
 let breadthHistoryPromise = null;
 
@@ -52,7 +55,7 @@ function renderBreadthIndicatorsSection(el, section, summary) {
           </button>`).join("")}
       </div>
       <div class="bi-main" id="bi-panel" role="tabpanel">
-        <h3 class="bi-title" id="bi-title"></h3>
+        <div class="bi-head"><h3 class="bi-title" id="bi-title"></h3><span class="month-badge bi-latest" id="bi-latest"></span></div>
         <div class="chart-controls">
           <div class="range-btns" role="group" aria-label="Time range">
             ${Object.keys(BI_RANGES).map((r) => `<button type="button" data-range="${r}">${r}</button>`).join("")}
@@ -79,6 +82,7 @@ function renderBreadthIndicatorsSection(el, section, summary) {
   const status = el.querySelector("#bi-status");
   let history = null;
   let range = "6M";
+  const hidden = {}; // indicator key -> Set of line labels switched off in the legend
 
   function bounds() {
     const ind = history && history.indicators.find((i) => i.key === current);
@@ -89,6 +93,7 @@ function renderBreadthIndicatorsSection(el, section, summary) {
   function draw() {
     const meta = inds.find((i) => i.key === current);
     el.querySelector("#bi-title").textContent = meta.label;
+    el.querySelector("#bi-latest").textContent = meta.latest_text;
     el.querySelector("#bi-theory").textContent = meta.theory;
     el.querySelector("#bi-interp").textContent = meta.interpretation;
     tabs.forEach((t) => {
@@ -109,9 +114,22 @@ function renderBreadthIndicatorsSection(el, section, summary) {
     } else {
       rangeBtns.forEach((b) => b.setAttribute("aria-pressed", "false"));
     }
-    const legend = renderBreadthIndicatorChart("bi-chart", ind, fromInput.value, toInput.value, history.index_name);
-    el.querySelector("#bi-legend").innerHTML = legend.map((l) =>
-      `<span class="legend-item"><span class="legend-swatch" style="background:${l.color}${l.dash ? ";height:2px;border-radius:0" : ""}"></span>${l.label}</span>`).join("");
+    const off = hidden[current] || (hidden[current] = new Set());
+    const legend = renderBreadthIndicatorChart("bi-chart", ind, fromInput.value, toInput.value, history.index_name, off);
+    const legendEl = el.querySelector("#bi-legend");
+    const toggles = legend.length > 1;
+    legendEl.innerHTML = legend.map((l) => {
+      const swatch = `<span class="legend-swatch" style="background:${l.color}${l.dash ? ";height:2px;border-radius:0" : ""}"></span>`;
+      return toggles
+        ? `<button type="button" class="legend-item bi-toggle" data-label="${l.label}" aria-pressed="${!off.has(l.label)}">${swatch}${l.label}</button>`
+        : `<span class="legend-item">${swatch}${l.label}</span>`;
+    }).join("") + (toggles ? `<span class="bi-legend-hint">Click to show or hide a line</span>` : "");
+    legendEl.querySelectorAll(".bi-toggle").forEach((b) => b.addEventListener("click", () => {
+      const label = b.dataset.label;
+      if (off.has(label)) off.delete(label); else off.add(label);
+      draw();
+      legendEl.querySelector(`.bi-toggle[data-label="${CSS.escape(label)}"]`)?.focus();
+    }));
   }
 
   function select(key, focus) {
@@ -139,7 +157,7 @@ function renderBreadthIndicatorsSection(el, section, summary) {
   status.textContent = "Loading history…";
   loadBreadthHistory().then((h) => {
     history = h;
-    status.textContent = `Universe: current S&P 500 members (today's list used for the whole history). Index shown: ${h.index_name}.`;
+    status.textContent = "Universe: current S&P 500 members (today's list used for the whole history).";
     requestAnimationFrame(draw);
   }).catch(() => {
     status.textContent = "Couldn't load the indicator history. Reload the page to try again.";
@@ -147,7 +165,7 @@ function renderBreadthIndicatorsSection(el, section, summary) {
 }
 
 // Draws one indicator; returns legend entries [{label, color, dash}].
-function renderBreadthIndicatorChart(canvasId, ind, from, to, indexName) {
+function renderBreadthIndicatorChart(canvasId, ind, from, to, indexName, off = new Set()) {
   const canvas = document.getElementById(canvasId);
   if (!canvas) return [];
   const existing = Chart.getChart(canvas);
@@ -164,10 +182,20 @@ function renderBreadthIndicatorChart(canvasId, ind, from, to, indexName) {
   let lineIdx = 0;
   const datasets = ind.lines.map((line) => {
     const data = inRange(line.data);
+    if (line.type === "area" && line.color) {
+      // Filled from zero; later areas are drawn on top of earlier ones.
+      const c = biColor(line.color);
+      legend.push({ label: line.label, color: c });
+      return {
+        type: "line", label: line.label, data, yAxisID: "y", order: 2, hidden: off.has(line.label),
+        borderColor: c, borderWidth: 1, backgroundColor: c + "b3",
+        fill: "origin", pointRadius: 0, pointHoverRadius: 3, tension: 0,
+      };
+    }
     if (line.type === "area") {
       legend.push({ label: line.label, color: indexLine });
       return {
-        type: "line", label: line.label, data, yAxisID: "y2", order: 3,
+        type: "line", label: line.label, data, yAxisID: "y2", order: 3, hidden: off.has(line.label),
         borderColor: indexLine, borderWidth: 1, backgroundColor: indexFill,
         fill: "start", pointRadius: 0, pointHoverRadius: 3, tension: 0,
       };
@@ -187,22 +215,25 @@ function renderBreadthIndicatorChart(canvasId, ind, from, to, indexName) {
         legend.push({ label: line.label, color: c });
       }
       return {
-        type: "bar", label: line.label, data, yAxisID: "y", order: 2,
+        type: "bar", label: line.label, data, yAxisID: "y", order: 2, hidden: off.has(line.label),
         backgroundColor: colors, borderWidth: 0, barPercentage: 1, categoryPercentage: 1, grouped: false,
       };
     }
     const dashed = !!line.dash;
-    const color = dashed ? muted : BI_LINE_COLORS[lineIdx++ % BI_LINE_COLORS.length];
+    const color = line.color ? biColor(line.color) : dashed ? muted : BI_LINE_COLORS[lineIdx++ % BI_LINE_COLORS.length];
     legend.push({ label: line.label, color, dash: dashed });
     return {
-      type: "line", label: line.label, data, yAxisID: "y", order: 1,
-      borderColor: color, borderWidth: dashed ? 1.25 : 1.75, borderDash: dashed ? [5, 4] : [],
+      type: "line", label: line.label, data, yAxisID: "y", order: 1, hidden: off.has(line.label),
+      borderColor: color, borderWidth: dashed ? 1.25 : line.color ? 2 : 1.75, borderDash: dashed ? [5, 4] : [],
       pointRadius: 0, pointHoverRadius: 4, tension: 0.1, fill: false,
     };
   });
 
   const hasY2 = ind.lines.some((l) => l.axis === "y2");
-  const refs = (ind.refs || []).map((v) => ({ value: v, color: v === 0 || v === 50 ? muted : border, dash: v === 0 ? [] : [4, 4] }));
+  const refs = (ind.refs || []).map((r) => (typeof r === "object"
+    // Labelled level: dashed line in its tone with a value pill.
+    ? { value: r.value, color: r.tone === "neutral" ? "#a8a29e" : biColor(r.tone), dash: [5, 4], label: `${r.value}${ind.unit === "%" ? "%" : ""}` }
+    : { value: r, color: r === 0 || r === 50 ? muted : border, dash: r === 0 ? [] : [4, 4] }));
   const yScale = { position: "left", ticks: { color: muted }, grid: { color: border } };
   if (ind.range) { yScale.min = ind.range[0]; yScale.max = ind.range[1]; }
   if (ind.unit === "%") yScale.ticks.callback = (v) => `${v}%`;
@@ -224,7 +255,7 @@ function renderBreadthIndicatorChart(canvasId, ind, from, to, indexName) {
     const withYear = first || d.getMonth() === 0;
     return d.toLocaleDateString("en-GB", { month: "short", ...(withYear ? { year: "numeric" } : {}) });
   };
-  const fmt = (v) => (Math.abs(v) >= 1000 ? v.toLocaleString(undefined, { maximumFractionDigits: 0 }) : v.toFixed(1));
+  const fmt = (v) => (Number.isInteger(v) || Math.abs(v) >= 1000 ? v.toLocaleString(undefined, { maximumFractionDigits: 0 }) : v.toFixed(Math.abs(v) < 10 ? 2 : 1));
 
   new Chart(canvas.getContext("2d"), {
     data: { datasets },
@@ -258,11 +289,7 @@ function renderBreadthIndicatorChart(canvasId, ind, from, to, indexName) {
         legend: { display: false },
         tooltip: {
           callbacks: {
-            // New lows are drawn below zero but read as a positive count.
-            label: (c) => {
-              const v = c.dataset.label.startsWith("New 52-week lows") ? Math.abs(c.parsed.y) : c.parsed.y;
-              return `${c.dataset.label}: ${fmt(v)}${ind.unit === "%" ? "%" : ""}`;
-            },
+            label: (c) => `${c.dataset.label}: ${fmt(c.parsed.y)}${ind.unit === "%" ? "%" : ""}`,
           },
         },
         referenceLines: { lines: refs },

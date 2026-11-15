@@ -50,6 +50,22 @@ def test_new_high_window_drops_old_peak(monkeypatch):
     assert c["nh"] == [None, None, 0, 1]  # the 10 has left the window by day 4
 
 
+def test_stochastic():
+    assert bi.stochastic([1, 2, 3, 2.5, None, 5, 5], 3) == [None, None, 100.0, 50.0, None, None, None]
+    assert bi.stochastic([4, 4, 4], 3)[-1] == 50.0
+
+
+def test_near_highs_and_lows(monkeypatch):
+    monkeypatch.setattr(bi, "HL_DAYS", 3)
+    a = [90.0, 100.0, 96.0]    # within 5% of its high (100), not of its low (90)
+    b = [100.0, 100.0, 104.0]  # within 5% of both its low (100) and its high (104)
+    c = [100.0, 100.0, 80.0]   # at its low
+    cols = [a, b, c]
+    out = bi.daily_counts(_days(3), cols, cols, cols, [[1] * 3] * 3, min_coverage=1.0)
+    assert out["near_hi"][2] == pytest.approx(200 / 3)
+    assert out["near_lo"][2] == pytest.approx(200 / 3)
+
+
 def _synthetic(n=400, stocks=10):
     dates = [f"d{i:04d}" for i in range(n)]
     close = [[100 + (i * (s + 1) % 7) + i * 0.05 for i in range(n)] for s in range(stocks)]
@@ -77,14 +93,14 @@ def test_mcclellan_is_zero_for_constant_breadth():
         "adv": [None] + [60] * (n - 1), "dec": [None] + [40] * (n - 1),
         "issues": [None] + [100] * (n - 1),
         "up_vol": [None] + [1.0] * (n - 1), "down_vol": [None] + [1.0] * (n - 1),
-        "nh": [None] * n, "nl": [None] * n,
+        "nh": [None] * n, "nl": [None] * n, "near_hi": [None] * n, "near_lo": [None] * n,
         "pct_above": {m: [None] * n for m in bi.MA_SET},
     }
     out = bi.build_indicators(dates, counts)
     mcc = next(i for i in out["indicators"] if i["key"] == "mcclellan")
     assert mcc["latest"] == pytest.approx(0.0)
     adn = next(i for i in out["indicators"] if i["key"] == "adn")
-    assert adn["latest"] == pytest.approx(200.0)  # (60-40)/100*1000
+    assert adn["latest"] == pytest.approx(100.0)  # A/D line rising every day = top of its range
 
 
 def test_summation_equals_running_total_of_oscillator():
@@ -95,7 +111,7 @@ def test_summation_equals_running_total_of_oscillator():
     counts = {
         "adv": adv, "dec": dec, "issues": [None] + [100] * (n - 1),
         "up_vol": [None] + [1.0] * (n - 1), "down_vol": [None] + [1.0] * (n - 1),
-        "nh": [None] * n, "nl": [None] * n, "pct_above": {m: [None] * n for m in bi.MA_SET},
+        "nh": [None] * n, "nl": [None] * n, "near_hi": [None] * n, "near_lo": [None] * n, "pct_above": {m: [None] * n for m in bi.MA_SET},
     }
     out = {i["key"]: i for i in bi.build_indicators(dates, counts)["indicators"]}
     osc = [v for _, v in out["mcclellan"]["lines"][0]["data"]]

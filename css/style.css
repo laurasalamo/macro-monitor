@@ -957,7 +957,17 @@ main {
 .bi-tab-label { font-size: 0.9rem; }
 .bi-tab-value { font-size: 0.72rem; color: var(--text-muted); font-variant-numeric: tabular-nums; }
 
+.bi-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .bi-title { margin: 0; font-size: 1.05rem; color: var(--blue); }
+.bi-latest { font-variant-numeric: tabular-nums; }
+.bi-toggle {
+  font: inherit; color: inherit; background: none; cursor: pointer;
+  border: 1px solid var(--border); border-radius: 999px; padding: 3px 10px;
+}
+.bi-toggle:hover { background: var(--bg); }
+.bi-toggle:focus-visible { outline: 2px solid var(--blue); outline-offset: 1px; }
+.bi-toggle[aria-pressed="false"] { opacity: 0.45; text-decoration: line-through; }
+.bi-legend-hint { font-size: 0.75rem; color: var(--text-muted); align-self: center; }
 .bi-main .chart-controls { margin-top: 8px; }
 .bi-chart { height: 380px; }
 
