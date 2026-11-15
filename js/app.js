@@ -351,7 +351,7 @@ function renderFearGreedSection(el, section, fg) {
 
   const ranges = ["1M", "3M", "6M", "1Y", "Max"];
   const cards = fg.indicators.map((ind, i) => `
-    <article class="fg-ind" role="button" tabindex="0" data-index="${i}" aria-haspopup="dialog" title="Click to see the full history">
+    <article class="fg-ind" data-index="${i}">
       <div class="fg-ind-head">
         <h3>${ind.label}</h3>
         ${ratingChip(ind.rating, ind.score)}
@@ -359,6 +359,10 @@ function renderFearGreedSection(el, section, fg) {
       <div class="fg-ind-value">${ind.value_text}</div>
       <div class="fg-ind-chart"><canvas id="fg-ind-${i}" aria-label="${ind.label}, last 12 months"></canvas></div>
       <p class="fg-ind-desc">${ind.measures}${ind.proxy ? ` <span class="fg-proxy" title="${ind.proxy}">Proxy: ${ind.proxy}</span>` : ""}</p>
+      <button type="button" class="fg-expand" aria-haspopup="dialog">
+        <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M2 6V2h4M14 6V2h-4M2 10v4h4M14 10v4h-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        View larger chart
+      </button>
     </article>`).join("");
 
   el.innerHTML = `
@@ -405,15 +409,9 @@ function renderFearGreedSection(el, section, fg) {
   });
 
   const openModal = setupFearGreedModal(fg);
+  // The button is the obvious control; a click anywhere on the card works too.
   el.querySelectorAll(".fg-ind").forEach((card) => {
-    const open = () => openModal(Number(card.dataset.index));
-    card.addEventListener("click", open);
-    card.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" || e.key === " ") {
-        e.preventDefault();
-        open();
-      }
-    });
+    card.addEventListener("click", () => openModal(Number(card.dataset.index)));
   });
 }
 

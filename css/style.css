@@ -840,7 +840,25 @@ main {
   transition: border-color 0.12s ease, box-shadow 0.12s ease;
 }
 .fg-ind:hover { border-color: var(--text-muted); }
-.fg-ind:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+
+.fg-expand {
+  margin-top: auto;
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--blue);
+  background: transparent;
+  border: 1px solid var(--blue);
+  border-radius: 6px;
+  padding: 5px 10px;
+  cursor: pointer;
+}
+.fg-expand:hover { background: var(--blue); color: #fff; }
+.fg-expand:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
 
 .fg-modal-score {
   margin-left: auto;
@@ -856,7 +874,7 @@ main {
 .section .fg-ind-head h3 { margin: 0; color: var(--text); font-size: 0.92rem; }
 .fg-ind-value { font-size: 0.82rem; margin: 6px 0 4px; }
 .fg-ind-chart { position: relative; height: 140px; }
-.fg-ind-desc { font-size: 0.74rem; color: var(--text-muted); margin: 8px 0 0; }
+.fg-ind-desc { font-size: 0.74rem; color: var(--text-muted); margin: 8px 0 12px; }
 .fg-proxy { display: block; margin-top: 4px; font-style: italic; }
 
 @media (max-width: 640px) {
