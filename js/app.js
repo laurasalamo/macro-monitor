@@ -841,6 +841,11 @@ function renderSection(section, data) {
     return el;
   }
 
+  if (section.kind === "breadth_indicators") {
+    renderBreadthIndicatorsSection(el, section, data.breadth_indicators);
+    return el;
+  }
+
   if (section.kind === "momentum") {
     el.innerHTML = renderMomentumSection(section, data.momentum);
     return el;

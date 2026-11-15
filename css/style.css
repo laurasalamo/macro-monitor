@@ -918,3 +918,67 @@ main {
 .br-chart { height: 360px; }
 .legend-swatch.br-swatch-risk { background: var(--zone-risk); opacity: 0.6; }
 .legend-swatch.br-swatch-high { background: var(--zone-high); opacity: 0.6; }
+
+/* ---------------------------------------------------------------- breadth indicators */
+
+:root { --bi-index-fill: rgba(100, 116, 139, 0.18); --bi-index-line: rgba(100, 116, 139, 0.55); }
+@media (prefers-color-scheme: dark) {
+  :root { --bi-index-fill: rgba(148, 163, 184, 0.16); --bi-index-line: rgba(148, 163, 184, 0.5); }
+}
+
+#breadth_indicators > .history-head:first-child { margin-top: 0; }
+
+.bi-layout {
+  display: grid;
+  grid-template-columns: 210px minmax(0, 1fr);
+  gap: 12px 20px;
+  align-items: start;
+}
+
+.bi-tabs { display: flex; flex-direction: column; gap: 2px; border-left: 2px solid var(--border); padding-left: 8px; }
+
+.bi-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: left;
+  font: inherit;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--text);
+  cursor: pointer;
+}
+.bi-tab:hover { background: var(--bg); }
+.bi-tab:focus-visible { outline: 2px solid var(--blue); outline-offset: 1px; }
+.bi-tab[aria-selected="true"] { background: color-mix(in srgb, var(--blue) 14%, transparent); }
+.bi-tab[aria-selected="true"] .bi-tab-label { color: var(--blue); font-weight: 600; }
+.bi-tab-label { font-size: 0.9rem; }
+.bi-tab-value { font-size: 0.72rem; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+
+.bi-title { margin: 0; font-size: 1.05rem; color: var(--blue); }
+.bi-main .chart-controls { margin-top: 8px; }
+.bi-chart { height: 380px; }
+
+.bi-theory {
+  grid-column: 2;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 24px;
+  font-size: 0.86rem;
+  line-height: 1.55;
+  border-top: 1px solid var(--border);
+  padding-top: 14px;
+}
+.bi-theory h4 { margin: 0 0 6px; font-size: 0.95rem; color: var(--blue); }
+.bi-theory p { margin: 0 0 16px; color: var(--text); }
+
+@media (max-width: 700px) {
+  .bi-layout { grid-template-columns: minmax(0, 1fr); }
+  .bi-theory { grid-column: auto; grid-template-columns: minmax(0, 1fr); }
+  .bi-tabs { flex-direction: row; overflow-x: auto; border-left: 0; padding-left: 0; padding-bottom: 4px; }
+  .bi-tab { flex: 0 0 auto; }
+  .bi-tab-value { display: none; }
+  .bi-chart { height: 300px; }
+}

@@ -21,7 +21,8 @@ import fear_greed_logic as fg
 import momentum_logic as mom
 import regime_logic as regime
 import transforms as tx
-from breadth_client import BreadthFetchError, get_closes
+from breadth_client import BreadthFetchError, get_ohlcv
+import breadth_indicators as bi
 from fred_client import FredError, get_series
 from gold_client import GoldFetchError, get_gold_series
 from momentum_client import MomentumFetchError, get_ohlcv_series
@@ -230,21 +231,44 @@ def fetch_fear_greed(metrics, warnings):
 
 
 def fetch_breadth(warnings):
-    """% of S&P 500 stocks above their 20-day average. Optional: on failure the
-    section is left out (with a warning) instead of blocking the whole update."""
+    """% of S&P 500 stocks above their 20-day average, plus the breadth
+    indicator set (A/D line, McClellan, ...). Optional: on failure both are
+    left out (with a warning) instead of blocking the whole update.
+    Returns (breadth_section, indicators_payload)."""
     tickers = breadth.load_constituents()
     try:
-        dates, columns, priced = get_closes(tickers)
+        dates, fields, priced = get_ohlcv(tickers + ["^GSPC"])
     except BreadthFetchError as e:
         warnings.append(f"breadth: {e}")
-        return None
+        return None, None
+    index_closes = fields["close"].get("^GSPC")
+    if index_closes and any(v is not None for v in index_closes):
+        priced -= 1
+    cols = {k: [fields[k][t] for t in tickers] for k in fields}
     if priced < breadth.MIN_COVERAGE * len(tickers):
         warnings.append(f"breadth: only {priced}/{len(tickers)} tickers priced")
-    series = breadth.pct_above_sma(dates, columns)
+    series = breadth.pct_above_sma(dates, cols["close"])
     result = breadth.build_breadth(series, len(tickers), priced)
     if not result:
         warnings.append("breadth: no dates with enough tickers priced")
-    return result
+
+    counts = bi.daily_counts(dates, cols["close"], cols["high"], cols["low"], cols["volume"])
+    indicators = bi.build_indicators(dates, counts, index_closes)
+    if not indicators:
+        warnings.append("breadth indicators: no dates with enough tickers priced")
+    return result, indicators
+
+
+def breadth_indicator_summary(payload):
+    """The small part of the indicator payload that goes into data.json (the
+    full histories live in data/breadth_history.json)."""
+    if not payload:
+        return None
+    return {
+        "as_of": payload["as_of"],
+        "index_name": payload["index_name"],
+        "indicators": [{k: v for k, v in ind.items() if k != "lines"} for ind in payload["indicators"]],
+    }
 
 
 def build_fear_greed_history(section):
@@ -344,7 +368,7 @@ def empty_sections(output):
     for name, section in output.items():
         if name == "generated_at_utc":
             continue
-        if name == "breadth":
+        if name in ("breadth", "breadth_indicators"):
             continue  # optional section, see fetch_breadth
         if name == "fear_greed":
             has_data = bool(section and section.get("indicators"))
@@ -413,9 +437,12 @@ def main():
     metrics["adj_growth"], metrics["consumption_backed"] = build_consumption_metrics(metrics)
 
     print("Computing % of S&P 500 stocks above their 20-day average (Yahoo Finance)...")
-    breadth_section = fetch_breadth(warnings)
+    breadth_section, breadth_payload = fetch_breadth(warnings)
     if breadth_section:
         print(f"  -> {breadth_section['as_of']}: {breadth_section['latest']}% ({breadth_section['priced']}/{breadth_section['universe']} priced)")
+    if breadth_payload:
+        for ind in breadth_payload["indicators"]:
+            print(f"  -> {ind['label']}: {ind['latest_text']}")
 
     print("Computing Fear & Greed index (Yahoo Finance + FRED spreads)...")
     fear_greed_section = fetch_fear_greed(metrics, warnings)
@@ -439,6 +466,7 @@ def main():
         "regime": regime_section,
         "fear_greed": fear_greed_section,
         "breadth": breadth_section,
+        "breadth_indicators": breadth_indicator_summary(breadth_payload),
         "credit_spreads": {
             "hy_oas": metrics.get("hy_oas"),
             "ig_oas": metrics.get("ig_oas"),
@@ -516,6 +544,10 @@ def main():
         with open(os.path.join(DATA_DIR, "fear_greed_history.json"), "w") as f:
             json.dump(fear_greed_history, f, separators=(",", ":"))
 
+    if breadth_payload:
+        with open(os.path.join(DATA_DIR, "breadth_history.json"), "w") as f:
+            json.dump(breadth_payload, f, separators=(",", ":"))
+
     with open(os.path.join(DATA_DIR, "meta.json"), "w") as f:
         json.dump({"generated_at_utc": output["generated_at_utc"], "warnings": warnings}, f, indent=2)
 
@@ -524,7 +556,7 @@ def main():
         for w in warnings:
             print(f"  WARN: {w}", file=sys.stderr)
 
-    print(f"\nWrote data/data.json, data/regime_history.json, data/fear_greed_history.json and data/meta.json at {output['generated_at_utc']}")
+    print(f"\nWrote data/data.json, data/regime_history.json, data/fear_greed_history.json, data/breadth_history.json and data/meta.json at {output['generated_at_utc']}")
 
 
 if __name__ == "__main__":

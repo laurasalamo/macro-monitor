@@ -10,7 +10,9 @@ Regime Dashboard (7 indicators rated bullish / neutral / bearish, thresholds in
 `scripts/regime_logic.py`; click a card for its full FRED history), Fear & Greed (CNN's seven
 sentiment indicators recomputed from Yahoo Finance + FRED in `scripts/fear_greed_logic.py`, with gauge,
 timeline and per-indicator charts), Market Breadth (% of S&P 500 stocks above their 20-day average,
-with 25% / 20% risk bands; members listed in `scripts/sp500_constituents.txt`, refresh it now and then), Credit Spreads, Inflation Expectations (5Y & 10Y nominal, breakeven and TIPS yields, plus Core PCE), Liquidity &
+with 25% / 20% risk bands; members listed in `scripts/sp500_constituents.txt`, refresh it now and then), Breadth Indicators (A/D line, net advances, McClellan Oscillator,
+Summation Index/RASI, new highs & lows, % above 20/50/200-day averages, High-Low Index and up-volume share,
+computed from the S&P 500 members in `scripts/breadth_indicators.py`), Credit Spreads, Inflation Expectations (5Y & 10Y nominal, breakeven and TIPS yields, plus Core PCE), Liquidity &
 Financial Conditions, Yield Curve Shape, Growth & Inflation (incl. GDP and real consumption adjusted by the saving rate), Labor Market, Cross-Asset, Treasury Spreads,
 Momentum Composite (ETF ranking).
 
