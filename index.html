@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Macro Monitor</title>
 <!-- ?v= busts browser caches: bump it whenever css/ or js/ changes. -->
-<link rel="stylesheet" href="css/style.css?v=20261115-1">
+<link rel="stylesheet" href="css/style.css?v=20261115-2">
 </head>
 <body>
 <header class="site-header">
@@ -45,14 +45,42 @@
   </div>
 </dialog>
 
+<dialog id="fg-modal" class="ind-modal" aria-labelledby="fg-modal-title">
+  <div class="ind-modal-inner">
+    <div class="ind-modal-head">
+      <div>
+        <h2 id="fg-modal-title"></h2>
+        <div id="fg-modal-sub" class="ind-modal-sub"></div>
+      </div>
+      <button type="button" class="ind-modal-close" aria-label="Close">&#x2715;</button>
+    </div>
+    <div class="ind-modal-controls">
+      <div class="range-btns" role="group" aria-label="Time range">
+        <button type="button" data-range="6M">6M</button>
+        <button type="button" data-range="1Y">1Y</button>
+        <button type="button" data-range="2Y">2Y</button>
+        <button type="button" data-range="5Y">5Y</button>
+        <button type="button" data-range="Max">Max</button>
+      </div>
+      <div class="date-range">
+        <label for="fg-from">From</label><input type="date" id="fg-from">
+        <label for="fg-to">to</label><input type="date" id="fg-to">
+      </div>
+      <span id="fg-modal-score" class="fg-modal-score"></span>
+    </div>
+    <div class="ind-modal-chart"><canvas id="fg-chart"></canvas></div>
+    <div id="fg-modal-note" class="ind-modal-note"></div>
+  </div>
+</dialog>
+
 <footer class="site-footer">
   <p>Personal project. Data via <a href="https://fred.stlouisfed.org" target="_blank" rel="noopener">FRED</a> (Federal Reserve Bank of St. Louis) and <a href="https://finance.yahoo.com" target="_blank" rel="noopener">Yahoo Finance</a>. Refreshed daily.</p>
 </footer>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
-<script src="js/config.js?v=20261115-1"></script>
-<script src="js/charts.js?v=20261115-1"></script>
-<script src="js/app.js?v=20261115-1"></script>
+<script src="js/config.js?v=20261115-2"></script>
+<script src="js/charts.js?v=20261115-2"></script>
+<script src="js/app.js?v=20261115-2"></script>
 </body>
 </html>

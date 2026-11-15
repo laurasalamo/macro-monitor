@@ -264,13 +264,20 @@ def build_fear_greed(dates, closes, spreads):
             return None
         return {"label": label, "date": point[0], "score": round(point[1]), "rating": rating(point[1])}
 
-    indicators = []
+    indicators, full_lines = [], []
     cutoff = max(0, len(dates) - CHART_DAYS)
     for ind in INDICATORS:
         k = ind["key"]
         idx = max((i for i, s in enumerate(scores[k]) if s is not None), default=None)
         cur = scores[k][idx] if idx is not None else None
         raw_v = raw[k][idx] if idx is not None else None
+        full_lines.append({
+            "key": k,
+            "lines": [
+                {"label": label, "data": [(dates[i], round(vals[i], 4)) for i in range(len(dates)) if vals[i] is not None]}
+                for label, vals in lines[k]
+            ],
+        })
         indicators.append({
             **ind,
             "score": round(cur) if cur is not None else None,
@@ -294,4 +301,7 @@ def build_fear_greed(dates, closes, spreads):
         "history": [[d, round(v, 1)] for d, v in composite],
         "indicators": indicators,
         "bands": [[upper, label] for upper, label in BANDS],
+        # Full raw history per indicator for the pop-up charts; fetch_data.py
+        # moves this out to its own file so data.json stays small.
+        "full_lines": full_lines,
     }

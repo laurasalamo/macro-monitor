@@ -351,7 +351,7 @@ function renderFearGreedSection(el, section, fg) {
 
   const ranges = ["1M", "3M", "6M", "1Y", "Max"];
   const cards = fg.indicators.map((ind, i) => `
-    <article class="fg-ind">
+    <article class="fg-ind" role="button" tabindex="0" data-index="${i}" aria-haspopup="dialog" title="Click to see the full history">
       <div class="fg-ind-head">
         <h3>${ind.label}</h3>
         ${ratingChip(ind.rating, ind.score)}
@@ -403,6 +403,103 @@ function renderFearGreedSection(el, section, fg) {
     if (last) applyRange("1Y");
     fg.indicators.forEach((ind, i) => renderMiniChart(`fg-ind-${i}`, ind.lines, ind.unit));
   });
+
+  const openModal = setupFearGreedModal(fg);
+  el.querySelectorAll(".fg-ind").forEach((card) => {
+    const open = () => openModal(Number(card.dataset.index));
+    card.addEventListener("click", open);
+    card.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        open();
+      }
+    });
+  });
+}
+
+let fearGreedHistoryPromise = null;
+
+function loadFearGreedHistory() {
+  if (!fearGreedHistoryPromise) {
+    fearGreedHistoryPromise = fetch("data/fear_greed_history.json", { cache: "no-store" }).then((res) => {
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.json();
+    });
+    fearGreedHistoryPromise.catch(() => { fearGreedHistoryPromise = null; }); // allow a retry
+  }
+  return fearGreedHistoryPromise;
+}
+
+// Large pop-up chart of one indicator's full history. Falls back to the
+// 12 months already in data.json if the history file can't be loaded.
+function setupFearGreedModal(fg) {
+  const dialog = document.getElementById("fg-modal");
+  const fromInput = document.getElementById("fg-from");
+  const toInput = document.getElementById("fg-to");
+  const note = document.getElementById("fg-modal-note");
+  const rangeButtons = [...dialog.querySelectorAll(".range-btns button")];
+  let active = null; // { lines, unit, firstDate, lastDate }
+  let lastRange = "2Y";
+
+  function draw(from, to) {
+    fromInput.value = from;
+    toInput.value = to;
+    renderIndicatorChart("fg-chart", active.lines, [], from, to);
+  }
+
+  function applyRange(range) {
+    lastRange = range;
+    rangeButtons.forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.range === range)));
+    const months = RANGE_MONTHS[range];
+    const from = months ? isoMonthsBefore(active.lastDate, months) : active.firstDate;
+    draw(from < active.firstDate ? active.firstDate : from, active.lastDate);
+  }
+
+  function applyCustomRange() {
+    if (!active || !fromInput.value || !toInput.value || fromInput.value >= toInput.value) return;
+    rangeButtons.forEach((b) => b.setAttribute("aria-pressed", "false"));
+    draw(fromInput.value, toInput.value);
+  }
+
+  rangeButtons.forEach((b) => b.addEventListener("click", () => active && applyRange(b.dataset.range)));
+  fromInput.addEventListener("change", applyCustomRange);
+  toInput.addEventListener("change", applyCustomRange);
+  dialog.querySelector(".ind-modal-close").addEventListener("click", () => dialog.close());
+  dialog.addEventListener("click", (e) => { if (e.target === dialog) dialog.close(); });
+
+  return async function open(index) {
+    const ind = fg.indicators[index];
+    document.getElementById("fg-modal-title").textContent = ind.label;
+    document.getElementById("fg-modal-sub").textContent = ind.measures;
+    document.getElementById("fg-modal-score").innerHTML = `${ind.value_text} &nbsp;${ratingChip(ind.rating, ind.score)}`;
+    note.textContent = "Loading history…";
+    if (!dialog.open) dialog.showModal();
+
+    let lines = ind.lines;
+    let fallback = false;
+    try {
+      const hist = await loadFearGreedHistory();
+      lines = (hist.indicators || {})[ind.key] || lines;
+    } catch (e) {
+      fallback = true;
+    }
+    const chartLines = lines.map((l, i) => ({ label: l.label, data: l.data, unit: "", secondary: i > 0 }));
+    const main = chartLines[0].data;
+    if (!main.length) {
+      note.textContent = "No history available for this indicator.";
+      return;
+    }
+    active = { lines: chartLines, firstDate: main[0][0], lastDate: main[main.length - 1][0] };
+    fromInput.min = toInput.min = active.firstDate;
+    fromInput.max = toInput.max = active.lastDate;
+    const source = ind.key === "junk" ? "FRED (ICE BofA OAS)" : "Yahoo Finance";
+    note.textContent = [
+      ind.proxy ? `Proxy: ${ind.proxy}` : "",
+      fallback ? "Full history unavailable; showing the last 12 months." : "Daily for the last 2 years, weekly before.",
+      `Source: ${source}.`,
+    ].filter(Boolean).join(" ");
+    applyRange(lastRange);
+  };
 }
 
 // ---------------------------------------------------------------- section chart controls

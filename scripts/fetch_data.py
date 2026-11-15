@@ -36,6 +36,7 @@ from series_config import (
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(SCRIPT_DIR, "..", "data")
+FEAR_GREED_DAILY_YEARS = 2  # pop-up charts: daily points for 2 years, weekly before
 
 
 def years_ago_iso(years):
@@ -226,6 +227,23 @@ def fetch_fear_greed(metrics, warnings):
     return result
 
 
+def build_fear_greed_history(section):
+    """Pops the full per-indicator lines out of the Fear & Greed section into
+    their own payload, thinning data older than FEAR_GREED_DAILY_YEARS to weekly."""
+    if not section:
+        return None
+    cutoff = years_ago_iso(FEAR_GREED_DAILY_YEARS)
+    return {
+        "indicators": {
+            ind["key"]: [
+                {"label": line["label"], "data": [list(p) for p in tx.thin_to_weekly_before(line["data"], cutoff)]}
+                for line in ind["lines"]
+            ]
+            for ind in section.pop("full_lines")
+        }
+    }
+
+
 def without_history(metric):
     if not metric:
         return metric
@@ -374,6 +392,7 @@ def main():
 
     print("Computing Fear & Greed index (Yahoo Finance + FRED spreads)...")
     fear_greed_section = fetch_fear_greed(metrics, warnings)
+    fear_greed_history = build_fear_greed_history(fear_greed_section)
     if fear_greed_section:
         print(f"  -> {fear_greed_section['as_of']}: {fear_greed_section['score']} ({fear_greed_section['rating']})")
 
@@ -465,6 +484,10 @@ def main():
     with open(os.path.join(DATA_DIR, "regime_history.json"), "w") as f:
         json.dump(regime_history, f, separators=(",", ":"))
 
+    if fear_greed_history:
+        with open(os.path.join(DATA_DIR, "fear_greed_history.json"), "w") as f:
+            json.dump(fear_greed_history, f, separators=(",", ":"))
+
     with open(os.path.join(DATA_DIR, "meta.json"), "w") as f:
         json.dump({"generated_at_utc": output["generated_at_utc"], "warnings": warnings}, f, indent=2)
 
@@ -473,7 +496,7 @@ def main():
         for w in warnings:
             print(f"  WARN: {w}", file=sys.stderr)
 
-    print(f"\nWrote data/data.json, data/regime_history.json and data/meta.json at {output['generated_at_utc']}")
+    print(f"\nWrote data/data.json, data/regime_history.json, data/fear_greed_history.json and data/meta.json at {output['generated_at_utc']}")
 
 
 if __name__ == "__main__":
