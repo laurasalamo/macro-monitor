@@ -39,6 +39,14 @@ const SECTIONS = [
   },
 
   {
+    id: "breadth",
+    title: "Market Breadth",
+    kind: "breadth",
+    description:
+      "Percentage of S&P 500 stocks closing above their own 20-day moving average (the S&P 500 version of TradingView's MMTW). Below 25% the market is entering a risk area; below 20% it is deeper in it. Computed daily from Yahoo Finance closes for the current index members.",
+  },
+
+  {
     id: "credit",
     title: "Credit Spreads",
     description:

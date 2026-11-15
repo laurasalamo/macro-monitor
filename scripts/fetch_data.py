@@ -16,10 +16,12 @@ from dotenv import load_dotenv
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+import breadth_logic as breadth
 import fear_greed_logic as fg
 import momentum_logic as mom
 import regime_logic as regime
 import transforms as tx
+from breadth_client import BreadthFetchError, get_closes
 from fred_client import FredError, get_series
 from gold_client import GoldFetchError, get_gold_series
 from momentum_client import MomentumFetchError, get_ohlcv_series
@@ -227,6 +229,24 @@ def fetch_fear_greed(metrics, warnings):
     return result
 
 
+def fetch_breadth(warnings):
+    """% of S&P 500 stocks above their 20-day average. Optional: on failure the
+    section is left out (with a warning) instead of blocking the whole update."""
+    tickers = breadth.load_constituents()
+    try:
+        dates, columns, priced = get_closes(tickers)
+    except BreadthFetchError as e:
+        warnings.append(f"breadth: {e}")
+        return None
+    if priced < breadth.MIN_COVERAGE * len(tickers):
+        warnings.append(f"breadth: only {priced}/{len(tickers)} tickers priced")
+    series = breadth.pct_above_sma(dates, columns)
+    result = breadth.build_breadth(series, len(tickers), priced)
+    if not result:
+        warnings.append("breadth: no dates with enough tickers priced")
+    return result
+
+
 def build_fear_greed_history(section):
     """Pops the full per-indicator lines out of the Fear & Greed section into
     their own payload, thinning data older than FEAR_GREED_DAILY_YEARS to weekly."""
@@ -324,6 +344,8 @@ def empty_sections(output):
     for name, section in output.items():
         if name == "generated_at_utc":
             continue
+        if name == "breadth":
+            continue  # optional section, see fetch_breadth
         if name == "fear_greed":
             has_data = bool(section and section.get("indicators"))
         elif name == "momentum":
@@ -390,6 +412,11 @@ def main():
 
     metrics["adj_growth"], metrics["consumption_backed"] = build_consumption_metrics(metrics)
 
+    print("Computing % of S&P 500 stocks above their 20-day average (Yahoo Finance)...")
+    breadth_section = fetch_breadth(warnings)
+    if breadth_section:
+        print(f"  -> {breadth_section['as_of']}: {breadth_section['latest']}% ({breadth_section['priced']}/{breadth_section['universe']} priced)")
+
     print("Computing Fear & Greed index (Yahoo Finance + FRED spreads)...")
     fear_greed_section = fetch_fear_greed(metrics, warnings)
     fear_greed_history = build_fear_greed_history(fear_greed_section)
@@ -411,6 +438,7 @@ def main():
         "generated_at_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "regime": regime_section,
         "fear_greed": fear_greed_section,
+        "breadth": breadth_section,
         "credit_spreads": {
             "hy_oas": metrics.get("hy_oas"),
             "ig_oas": metrics.get("ig_oas"),

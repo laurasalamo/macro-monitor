@@ -450,3 +450,91 @@ function renderMiniChart(canvasId, lines, unit) {
     },
   });
 }
+
+// ---------------------------------------------------------------- market breadth
+
+// Shaded risk bands (0-high, high-risk) with a small label inside each, and a
+// dashed 50% midline. Drawn behind the line.
+const riskBands = {
+  id: "riskBands",
+  beforeDatasetsDraw(chart, _args, opts) {
+    const { ctx, chartArea: area, scales: { y } } = chart;
+    const yRisk = y.getPixelForValue(opts.risk);
+    const yHigh = y.getPixelForValue(opts.high);
+    const yZero = y.getPixelForValue(0);
+    const y50 = Math.round(y.getPixelForValue(50)) + 0.5;
+    ctx.save();
+    ctx.globalAlpha = 0.2;
+    ctx.fillStyle = opts.riskColor;
+    ctx.fillRect(area.left, yRisk, area.right - area.left, yHigh - yRisk);
+    ctx.fillStyle = opts.highColor;
+    ctx.fillRect(area.left, yHigh, area.right - area.left, yZero - yHigh);
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = opts.muted;
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.moveTo(area.left, y50);
+    ctx.lineTo(area.right, y50);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.font = "600 10px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+    ctx.textBaseline = "middle";
+    ctx.textAlign = "left";
+    // Labels sit in the right-hand gutter (layout.padding.right), clear of the line.
+    const x = area.right + 6;
+    ctx.fillStyle = opts.text;
+    ctx.fillText("Risk", x, (yRisk + yHigh) / 2);
+    ctx.fillText("High risk", x, (yHigh + yZero) / 2);
+    ctx.restore();
+  },
+};
+
+function renderBreadthChart(canvasId, history, risk, high) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  const existing = Chart.getChart(canvas);
+  if (existing) existing.destroy();
+  const css = getComputedStyle(document.documentElement);
+  const get = (n) => css.getPropertyValue(n).trim();
+  const colors = {
+    line: CHART_COLORS[0], riskColor: get("--zone-risk"), highColor: get("--zone-high"),
+    muted: get("--text-muted"), border: get("--border"), text: get("--text"),
+  };
+  // The line turns orange/red while it's inside a risk band.
+  const segColor = (v) => (v < high ? colors.highColor : v < risk ? colors.riskColor : colors.line);
+  const zoneOf = (v) => (v < high ? "High risk" : v < risk ? "Risk zone" : "Normal");
+
+  new Chart(canvas.getContext("2d"), {
+    type: "line",
+    data: {
+      datasets: [{
+        label: "% above 20-day average",
+        data: history.map(([d, v]) => ({ x: d, y: v })),
+        borderWidth: 1.75,
+        borderColor: colors.line,
+        segment: { borderColor: (ctx) => segColor(Math.max(ctx.p0.parsed.y, ctx.p1.parsed.y)) },
+        fill: { target: "origin", above: colors.line + "14" },
+        pointRadius: 0,
+        pointHoverRadius: 4,
+        tension: 0.1,
+      }],
+    },
+    plugins: [riskBands],
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      layout: { padding: { right: 58 } },
+      scales: {
+        x: { type: "time", ticks: { maxRotation: 0, autoSkipPadding: 16, color: colors.muted }, grid: { color: colors.border } },
+        y: { min: 0, max: 100, ticks: { stepSize: 25, color: colors.muted, callback: (v) => `${v}%` }, grid: { color: colors.border } },
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: (c) => `${c.parsed.y.toFixed(1)}% · ${zoneOf(c.parsed.y)}` } },
+        riskBands: { risk, high, ...colors },
+      },
+      interaction: { mode: "index", intersect: false },
+    },
+  });
+}

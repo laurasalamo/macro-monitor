@@ -500,6 +500,74 @@ function setupFearGreedModal(fg) {
   };
 }
 
+// ---------------------------------------------------------------- market breadth
+
+const ZONE_SLUG = { Normal: "normal", Risk: "risk", "High risk": "high-risk" };
+const ZONE_WORD = { Normal: "Normal", Risk: "Risk zone", "High risk": "High risk" };
+
+function zoneChip(zone) {
+  return `<span class="br-chip br-${ZONE_SLUG[zone] || "normal"}">${ZONE_WORD[zone] || "—"}</span>`;
+}
+
+function renderBreadthSection(el, section, br) {
+  if (!br) {
+    el.innerHTML = `<h2>${section.title}</h2><p>No data today (the Yahoo Finance download failed); it will be back on the next update.</p>`;
+    return;
+  }
+  const delta = br.delta === null || br.delta === undefined ? ""
+    : `<span class="delta ${deltaClass(br.delta)}">${br.delta > 0 ? "↑" : br.delta < 0 ? "↓" : "→"} ${Math.abs(br.delta).toFixed(1)}pp</span>`;
+  const compare = (br.compare || []).map((c) => `
+    <div class="card br-card">
+      <div class="card-label">${c.label}</div>
+      <div class="br-small-value">${c.value.toFixed(1)}%</div>
+      <div class="card-meta"><span class="as-of">${fmtPeriod(c.date, "day")}</span></div>
+    </div>`).join("");
+  const ranges = ["3M", "6M", "1Y", "2Y", "5Y"];
+
+  el.innerHTML = `
+    <div class="history-head">
+      <h2>${section.title}</h2>
+      <span class="month-badge">${fmtPeriod(br.as_of, "day")}</span>
+    </div>
+    <p class="section-desc">${section.description}</p>
+    <div class="br-top">
+      <div class="card br-main br-${ZONE_SLUG[br.zone]}">
+        <div class="card-label">S&P 500 stocks above 20-day average</div>
+        <div class="br-value">${br.latest.toFixed(1)}<span class="card-unit">%</span></div>
+        <div class="card-meta">${delta} ${zoneChip(br.zone)}</div>
+      </div>
+      ${compare}
+      <div class="card br-card">
+        <div class="card-label">52-week range</div>
+        <div class="br-small-value">${br.low_52w.toFixed(1)}–${br.high_52w.toFixed(1)}%</div>
+        <div class="card-meta"><span class="as-of">${br.days_below_risk_1y} days below ${br.risk_level}% in the last year</span></div>
+      </div>
+    </div>
+    <h3 class="chart-title">% of S&P 500 stocks above their 20-day average</h3>
+    <div class="chart-controls">
+      <div class="range-btns" role="group" aria-label="Time range">
+        ${ranges.map((r) => `<button type="button" data-range="${r}">${r}</button>`).join("")}
+      </div>
+    </div>
+    <div class="chart-box br-chart"><canvas id="br-chart" aria-label="Percent of S&P 500 stocks above their 20-day average"></canvas></div>
+    <div class="fg-legend">
+      <span class="legend-item"><span class="legend-swatch br-swatch-risk"></span>Risk zone (${br.high_risk_level}–${br.risk_level}%)</span>
+      <span class="legend-item"><span class="legend-swatch br-swatch-high"></span>High risk (below ${br.high_risk_level}%)</span>
+    </div>
+    <p class="chart-note">${br.priced} of ${br.universe} current S&P 500 members priced. Uses today's membership for the whole history, so past readings carry slight survivorship bias. TradingView's MMTW covers all US-listed stocks, so its values differ somewhat.</p>`;
+
+  const history = br.history || [];
+  const last = history.length ? history[history.length - 1][0] : null;
+  const buttons = [...el.querySelectorAll(".range-btns button")];
+  function applyRange(range) {
+    buttons.forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.range === range)));
+    const from = isoMonthsBefore(last, RANGE_MONTHS[range]);
+    renderBreadthChart("br-chart", history.filter(([d]) => d >= from), br.risk_level, br.high_risk_level);
+  }
+  buttons.forEach((b) => b.addEventListener("click", () => applyRange(b.dataset.range)));
+  if (last) requestAnimationFrame(() => applyRange("1Y"));
+}
+
 // ---------------------------------------------------------------- section chart controls
 
 const RANGE_MONTHS = { "3M": 3, "6M": 6, "1Y": 12, "2Y": 24, "5Y": 60, "10Y": 120 };
@@ -765,6 +833,11 @@ function renderSection(section, data) {
 
   if (section.kind === "fear_greed") {
     renderFearGreedSection(el, section, data.fear_greed);
+    return el;
+  }
+
+  if (section.kind === "breadth") {
+    renderBreadthSection(el, section, data.breadth);
     return el;
   }
 

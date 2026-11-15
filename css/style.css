@@ -880,3 +880,41 @@ main {
 @media (max-width: 640px) {
   .fg-top { grid-template-columns: 1fr; }
 }
+
+/* ---------------------------------------------------------------- market breadth */
+
+:root { --zone-risk: var(--fg-fear); --zone-high: var(--fg-xfear); }
+
+#breadth > .history-head:first-child { margin-top: 0; }
+
+.br-top {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 4px;
+}
+@media (max-width: 900px) { .br-top { grid-template-columns: repeat(2, minmax(0, 1fr)); } .br-main { grid-column: span 2; } }
+.br-main { border-left: 4px solid var(--zone, var(--blue)); }
+.br-main.br-risk { --zone: var(--zone-risk); }
+.br-main.br-high-risk { --zone: var(--zone-high); }
+.br-value { font-size: 2.2rem; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; margin: 4px 0; }
+.br-small-value { font-size: 1.3rem; font-weight: 600; font-variant-numeric: tabular-nums; margin: 4px 0; }
+.br-main .card-meta { display: flex; align-items: center; gap: 10px; }
+
+.br-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  color: var(--text);
+  padding: 2px 9px 2px 7px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+.br-chip::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: var(--zone, var(--blue)); }
+.br-chip.br-risk { --zone: var(--zone-risk); }
+.br-chip.br-high-risk { --zone: var(--zone-high); }
+
+.br-chart { height: 360px; }
+.legend-swatch.br-swatch-risk { background: var(--zone-risk); opacity: 0.6; }
+.legend-swatch.br-swatch-high { background: var(--zone-high); opacity: 0.6; }
