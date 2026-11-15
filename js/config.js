@@ -31,6 +31,14 @@ const SECTIONS = [
   { id: "regime", title: "Regime Dashboard", kind: "regime" },
 
   {
+    id: "fear_greed",
+    title: "Fear & Greed",
+    kind: "fear_greed",
+    description:
+      "Market sentiment from the seven indicators of CNN's Fear & Greed Index, recomputed daily from free data (Yahoo Finance + FRED). Each indicator is scored 0–100 by where today's reading ranks in its own last two years; the index is their average. Values will differ from CNN's, which aren't available to automated clients.",
+  },
+
+  {
     id: "credit",
     title: "Credit Spreads",
     description:

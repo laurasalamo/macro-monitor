@@ -336,3 +336,117 @@ function renderRegimeHistoryChart(canvasId, monthly, total) {
     },
   });
 }
+
+// ---------------------------------------------------------------- fear & greed
+
+// Rating band colors come from the --fg-* CSS tokens so dark mode gets its own steps.
+function fearGreedColors() {
+  const css = getComputedStyle(document.documentElement);
+  const get = (n) => css.getPropertyValue(n).trim();
+  return {
+    "Extreme Fear": get("--fg-xfear"), "Fear": get("--fg-fear"), "Neutral": get("--fg-neutral"),
+    "Greed": get("--fg-greed"), "Extreme Greed": get("--fg-xgreed"),
+    muted: get("--text-muted"), border: get("--border"), text: get("--text"),
+  };
+}
+
+// Faint horizontal bands behind the timeline, one per rating zone.
+const zoneBands = {
+  id: "zoneBands",
+  beforeDatasetsDraw(chart, _args, opts) {
+    const { ctx, chartArea: area, scales: { y } } = chart;
+    ctx.save();
+    ctx.globalAlpha = 0.12;
+    let lower = 0;
+    for (const [upper, label] of opts.bands || []) {
+      const top = y.getPixelForValue(Math.min(upper, 100));
+      const bottom = y.getPixelForValue(lower);
+      ctx.fillStyle = opts.colors[label];
+      ctx.fillRect(area.left, top, area.right - area.left, bottom - top);
+      lower = upper;
+    }
+    ctx.restore();
+  },
+};
+
+function renderFearGreedTimeline(canvasId, history, bands) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  const existing = Chart.getChart(canvas);
+  if (existing) existing.destroy();
+  const c = fearGreedColors();
+  const ratingOf = (v) => {
+    const s = Math.round(v);
+    return (bands.find(([upper]) => s < upper) || bands[bands.length - 1])[1];
+  };
+  new Chart(canvas.getContext("2d"), {
+    type: "line",
+    data: {
+      datasets: [{
+        label: "Fear & Greed",
+        data: history.map(([d, v]) => ({ x: d, y: v })),
+        borderColor: c.text,
+        borderWidth: 2,
+        backgroundColor: "transparent",
+        pointRadius: 0,
+        pointHoverRadius: 4,
+        tension: 0.15,
+      }],
+    },
+    plugins: [zoneBands],
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      scales: {
+        x: { type: "time", ticks: { maxRotation: 0, autoSkipPadding: 16, color: c.muted }, grid: { color: c.border } },
+        y: { min: 0, max: 100, ticks: { stepSize: 25, color: c.muted }, grid: { color: c.border } },
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: (ctx) => `${Math.round(ctx.parsed.y)} · ${ratingOf(ctx.parsed.y)}` } },
+        zoneBands: { bands, colors: c },
+      },
+      interaction: { mode: "index", intersect: false },
+    },
+  });
+}
+
+// Compact chart for one indicator's raw signal (and its moving average, if any).
+function renderMiniChart(canvasId, lines, unit) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas || !lines || !lines.length) return;
+  const existing = Chart.getChart(canvas);
+  if (existing) existing.destroy();
+  const c = fearGreedColors();
+  const num = (v) => v.toLocaleString(undefined, { maximumFractionDigits: 2 });
+  new Chart(canvas.getContext("2d"), {
+    type: "line",
+    data: {
+      datasets: lines.map((line, i) => ({
+        label: line.label,
+        data: line.data.map(([d, v]) => ({ x: d, y: v })),
+        borderColor: i === 0 ? CHART_COLORS[0] : c.muted,
+        borderWidth: i === 0 ? 1.75 : 1.25,
+        borderDash: i === 0 ? [] : [4, 3],
+        backgroundColor: "transparent",
+        pointRadius: 0,
+        tension: 0.1,
+      })),
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      scales: {
+        x: { type: "time", time: { unit: "month" }, ticks: { maxRotation: 0, autoSkipPadding: 12, color: c.muted, font: { size: 10 } }, grid: { display: false } },
+        y: { ticks: { color: c.muted, font: { size: 10 }, maxTicksLimit: 4, callback: (v) => num(v) }, grid: { color: (g) => (g.tick && g.tick.value === 0 ? c.muted : c.border) } },
+      },
+      plugins: {
+        legend: { display: lines.length > 1, position: "bottom", labels: { color: c.muted, boxWidth: 12, boxHeight: 2, font: { size: 10 } } },
+        tooltip: { callbacks: { label: (ctx) => `${ctx.dataset.label}: ${num(ctx.parsed.y)}` } },
+      },
+      interaction: { mode: "index", intersect: false },
+    },
+  });
+}

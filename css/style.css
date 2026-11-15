@@ -22,6 +22,13 @@
   --bear-text: #b91c1c;
   --bear-fill: #ef4444;
   --recession: rgba(100, 116, 139, 0.16);
+
+  /* Fear & Greed bands: diverging red -> gray -> green. */
+  --fg-xfear: #b91c1c;
+  --fg-fear: #f97316;
+  --fg-neutral: #9ca3af;
+  --fg-greed: #84cc16;
+  --fg-xgreed: #15803d;
 }
 
 * { box-sizing: border-box; }
@@ -729,5 +736,112 @@ main {
     --bear-text: #f87171;
     --bear-fill: #ef4444;
     --recession: rgba(148, 163, 184, 0.16);
+
+    --fg-xfear: #dc2626;
+    --fg-fear: #f97316;
+    --fg-neutral: #6b7280;
+    --fg-greed: #84cc16;
+    --fg-xgreed: #15803d;
   }
+}
+
+/* ---------------------------------------------------------------- fear & greed */
+
+#fear_greed > .history-head:first-child { margin-top: 0; }
+
+.fg-xfear, .fg-extreme-fear { --fg: var(--fg-xfear); }
+.fg-fear { --fg: var(--fg-fear); }
+.fg-neutral { --fg: var(--fg-neutral); }
+.fg-greed { --fg: var(--fg-greed); }
+.fg-extreme-greed { --fg: var(--fg-xgreed); }
+
+.fg-top {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: 20px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.fg-gauge { position: relative; max-width: 380px; width: 100%; margin: 0 auto; }
+.fg-gauge-svg { width: 100%; height: auto; display: block; }
+.fg-arc { fill: none; stroke: var(--fg); }
+.fg-tick { font-size: 10px; fill: var(--text-muted); text-anchor: middle; }
+.fg-needle { stroke: var(--text); stroke-width: 3; stroke-linecap: round; }
+.fg-hub { fill: var(--text); }
+
+.fg-now { text-align: center; margin-top: -4px; }
+.fg-score { font-size: 2.6rem; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+.fg-rating { font-size: 1rem; font-weight: 600; margin-top: 4px; color: var(--text); }
+
+.fg-compare { list-style: none; margin: 0; padding: 0; }
+.fg-compare-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+.fg-compare-row:last-child { border-bottom: 0; }
+.fg-compare-label { display: flex; flex-direction: column; font-size: 0.88rem; }
+.fg-compare-date { font-size: 0.72rem; color: var(--text-muted); }
+
+.fg-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  font-size: 0.78rem;
+  color: var(--text);
+  padding: 3px 9px 3px 7px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+.fg-chip::before {
+  content: "";
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--fg, var(--text-muted));
+}
+.fg-chip strong { font-variant-numeric: tabular-nums; }
+
+.legend-swatch.fg-extreme-fear, .legend-swatch.fg-fear, .legend-swatch.fg-neutral,
+.legend-swatch.fg-greed, .legend-swatch.fg-extreme-greed { background: var(--fg); }
+
+.fg-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin-top: 8px;
+  font-size: 0.8rem;
+  color: var(--text);
+}
+
+.fg-ind-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 290px), 1fr));
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.fg-ind {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.fg-ind-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.section .fg-ind-head h3 { margin: 0; color: var(--text); font-size: 0.92rem; }
+.fg-ind-value { font-size: 0.82rem; margin: 6px 0 4px; }
+.fg-ind-chart { position: relative; height: 140px; }
+.fg-ind-desc { font-size: 0.74rem; color: var(--text-muted); margin: 8px 0 0; }
+.fg-proxy { display: block; margin-top: 4px; font-style: italic; }
+
+@media (max-width: 640px) {
+  .fg-top { grid-template-columns: 1fr; }
 }

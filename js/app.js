@@ -297,6 +297,114 @@ function renderMomentumSection(section, momentum) {
   return html;
 }
 
+// ---------------------------------------------------------------- fear & greed
+
+const ratingSlug = (rating) => (rating || "none").toLowerCase().replace(/\s+/g, "-");
+
+// Semicircle gauge: five band arcs from 0 (left) to 100 (right) and a needle.
+function fearGreedGaugeSVG(score, bands) {
+  const cx = 150, cy = 140, r = 110, w = 26;
+  const pt = (value, radius) => {
+    const a = Math.PI * (1 - value / 100);
+    return [cx + radius * Math.cos(a), cy - radius * Math.sin(a)];
+  };
+  const arc = (from, to) => {
+    const [x0, y0] = pt(from, r);
+    const [x1, y1] = pt(to, r);
+    return `M${x0.toFixed(1)},${y0.toFixed(1)} A${r},${r} 0 0 1 ${x1.toFixed(1)},${y1.toFixed(1)}`;
+  };
+  let lower = 0;
+  const gap = 0.6; // surface gap between bands, in score units
+  const arcs = bands.map(([upper, label]) => {
+    const to = Math.min(upper, 100);
+    const path = `<path d="${arc(lower + (lower ? gap : 0), to - (to < 100 ? gap : 0))}" class="fg-arc fg-${ratingSlug(label)}" stroke-width="${w}"><title>${label}: ${lower}–${to === 100 ? 100 : to - 1}</title></path>`;
+    lower = to;
+    return path;
+  }).join("");
+  const ticks = [0, 25, 50, 75, 100].map((v) => {
+    const [x, y] = pt(v, r - w / 2 - 12);
+    return `<text x="${x.toFixed(1)}" y="${(y + 4).toFixed(1)}" class="fg-tick">${v}</text>`;
+  }).join("");
+  const [nx, ny] = pt(score, r - 6);
+  return `
+    <svg viewBox="0 0 300 160" class="fg-gauge-svg" role="img" aria-label="Fear and Greed index ${score} out of 100">
+      ${arcs}${ticks}
+      <line x1="${cx}" y1="${cy}" x2="${nx.toFixed(1)}" y2="${ny.toFixed(1)}" class="fg-needle"/>
+      <circle cx="${cx}" cy="${cy}" r="7" class="fg-hub"/>
+    </svg>`;
+}
+
+function ratingChip(rating, score) {
+  return `<span class="fg-chip fg-${ratingSlug(rating)}">${score !== null && score !== undefined ? `<strong>${score}</strong> ` : ""}${rating || "No data"}</span>`;
+}
+
+function renderFearGreedSection(el, section, fg) {
+  if (!fg) {
+    el.innerHTML = `<h2>${section.title}</h2><p>No data.</p>`;
+    return;
+  }
+  const compare = (fg.compare || []).map((c) => `
+    <li class="fg-compare-row">
+      <span class="fg-compare-label">${c.label}<span class="fg-compare-date">${fmtPeriod(c.date, "day")}</span></span>
+      ${ratingChip(c.rating, c.score)}
+    </li>`).join("");
+
+  const ranges = ["1M", "3M", "6M", "1Y", "Max"];
+  const cards = fg.indicators.map((ind, i) => `
+    <article class="fg-ind">
+      <div class="fg-ind-head">
+        <h3>${ind.label}</h3>
+        ${ratingChip(ind.rating, ind.score)}
+      </div>
+      <div class="fg-ind-value">${ind.value_text}</div>
+      <div class="fg-ind-chart"><canvas id="fg-ind-${i}" aria-label="${ind.label}, last 12 months"></canvas></div>
+      <p class="fg-ind-desc">${ind.measures}${ind.proxy ? ` <span class="fg-proxy" title="${ind.proxy}">Proxy: ${ind.proxy}</span>` : ""}</p>
+    </article>`).join("");
+
+  el.innerHTML = `
+    <div class="history-head">
+      <h2>${section.title}</h2>
+      <span class="month-badge">${fmtPeriod(fg.as_of, "day")}</span>
+    </div>
+    <p class="section-desc">${section.description}</p>
+    <div class="fg-top">
+      <div class="fg-gauge">
+        ${fearGreedGaugeSVG(fg.score, fg.bands)}
+        <div class="fg-now">
+          <div class="fg-score">${fg.score}</div>
+          <div class="fg-rating fg-text-${ratingSlug(fg.rating)}">${fg.rating}</div>
+        </div>
+      </div>
+      <ul class="fg-compare">${compare}</ul>
+    </div>
+    <h3 class="chart-title">Timeline</h3>
+    <div class="chart-controls">
+      <div class="range-btns" role="group" aria-label="Time range">
+        ${ranges.map((r) => `<button type="button" data-range="${r}">${r}</button>`).join("")}
+      </div>
+    </div>
+    <div class="chart-box"><canvas id="fg-timeline" aria-label="Fear and Greed index history"></canvas></div>
+    <div class="fg-legend">${fg.bands.map(([, label]) => `<span class="legend-item"><span class="legend-swatch fg-${ratingSlug(label)}"></span>${label}</span>`).join("")}</div>
+    <h3 class="chart-title">Indicators</h3>
+    <div class="fg-ind-grid">${cards}</div>`;
+
+  const history = fg.history || [];
+  const last = history.length ? history[history.length - 1][0] : null;
+  const buttons = [...el.querySelectorAll(".range-btns button")];
+  function applyRange(range) {
+    buttons.forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.range === range)));
+    const months = RANGE_MONTHS[range];
+    const from = months ? isoMonthsBefore(last, months) : history[0][0];
+    renderFearGreedTimeline("fg-timeline", history.filter(([d]) => d >= from), fg.bands);
+  }
+  buttons.forEach((b) => b.addEventListener("click", () => applyRange(b.dataset.range)));
+
+  requestAnimationFrame(() => {
+    if (last) applyRange("1Y");
+    fg.indicators.forEach((ind, i) => renderMiniChart(`fg-ind-${i}`, ind.lines, ind.unit));
+  });
+}
+
 // ---------------------------------------------------------------- section chart controls
 
 const RANGE_MONTHS = { "3M": 3, "6M": 6, "1Y": 12, "2Y": 24, "5Y": 60, "10Y": 120 };
@@ -557,6 +665,11 @@ function renderSection(section, data) {
 
   if (section.kind === "macro") {
     renderMacroSection(el, section, data);
+    return el;
+  }
+
+  if (section.kind === "fear_greed") {
+    renderFearGreedSection(el, section, data.fear_greed);
     return el;
   }
 

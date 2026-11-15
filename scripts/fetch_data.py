@@ -16,6 +16,7 @@ from dotenv import load_dotenv
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+import fear_greed_logic as fg
 import momentum_logic as mom
 import regime_logic as regime
 import transforms as tx
@@ -203,6 +204,28 @@ def fetch_momentum(warnings):
     }
 
 
+def fetch_fear_greed(metrics, warnings):
+    """Fear & Greed index from Yahoo closes + the FRED HY/IG spreads already fetched."""
+    raw = {}
+    for key, ticker in fg.TICKERS.items():
+        try:
+            raw[key] = [(d, c) for d, c, _ in get_ohlcv_series(ticker)]
+        except MomentumFetchError as e:
+            warnings.append(f"fear_greed {ticker}: {e}")
+            return None
+    hist = lambda k: [tuple(p) for p in (metrics.get(k) or {}).get("history", [])]
+    if not hist("hy_oas") or not hist("ig_oas"):
+        warnings.append("fear_greed: HY/IG spreads missing, junk bond indicator unavailable")
+        return None
+    dates = [d for d, _ in raw["spx"]]
+    closes = {k: fg.align(s, dates) for k, s in raw.items()}
+    spreads = {"hy": fg.align(hist("hy_oas"), dates), "ig": fg.align(hist("ig_oas"), dates)}
+    result = fg.build_fear_greed(dates, closes, spreads)
+    if not result:
+        warnings.append("fear_greed: not enough overlapping history to score")
+    return result
+
+
 def without_history(metric):
     if not metric:
         return metric
@@ -283,7 +306,9 @@ def empty_sections(output):
     for name, section in output.items():
         if name == "generated_at_utc":
             continue
-        if name == "momentum":
+        if name == "fear_greed":
+            has_data = bool(section and section.get("indicators"))
+        elif name == "momentum":
             has_data = bool(section.get("rows"))
         elif name == "yield_curve":
             has_data = bool(section.get("current"))
@@ -347,6 +372,11 @@ def main():
 
     metrics["adj_growth"], metrics["consumption_backed"] = build_consumption_metrics(metrics)
 
+    print("Computing Fear & Greed index (Yahoo Finance + FRED spreads)...")
+    fear_greed_section = fetch_fear_greed(metrics, warnings)
+    if fear_greed_section:
+        print(f"  -> {fear_greed_section['as_of']}: {fear_greed_section['score']} ({fear_greed_section['rating']})")
+
     regime_section = build_regime_section(metrics)
     regime_history = build_regime_history(metrics, recessions)
 
@@ -361,6 +391,7 @@ def main():
     output = {
         "generated_at_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "regime": regime_section,
+        "fear_greed": fear_greed_section,
         "credit_spreads": {
             "hy_oas": metrics.get("hy_oas"),
             "ig_oas": metrics.get("ig_oas"),
