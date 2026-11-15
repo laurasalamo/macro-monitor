@@ -16,8 +16,8 @@ MIN_COVERAGE = 0.9   # need 90% of members with a close today and yesterday
 HL_DAYS = 252        # 52-week window for new highs / lows
 AD_MA_DAYS = 100     # moving average drawn on the A/D line
 MA_SET = (20, 50, 200)
-ADN_DAYS = 30        # look-back for the normalized A/D line
-ADN_SMOOTH = 5       # smoothing of the normalized A/D line
+ADN_DAYS = 21        # ADn: 21-day stochastic of the A/D line...
+ADN_SMOOTH = 7       # ...smoothed with a 7-day exponential average (amplitudmercado.com)
 NEAR_PCT = 5         # "near" a 52-week high / low = within this many percent
 
 
@@ -199,44 +199,44 @@ TEXT = {
     },
     "adn": {
         "label": "ADn Line",
-        "theory": f"The normalized A/D line: where today's advance/decline line sits within its own range of the last {ADN_DAYS} trading days, on a 0–100 scale (0 = the lowest point of the period, 100 = the highest), smoothed over {ADN_SMOOTH} days. It turns the open-ended A/D line into a bounded oscillator.",
-        "interpretation": "Above 80 breadth is overbought: the A/D line is near the top of its recent range and the advance is stretched. Below 20 it is oversold, and turns up from there often mark short-term lows. Crossing 50 shows which side, advancers or decliners, has taken control. Long stays near 0 or 100 mean a strong trend rather than an imminent reversal.",
+        "theory": f"The normalized A/D line, based on the work of Tushar Chande as adapted by Greg Morris: a {ADN_DAYS}-day stochastic of the advance/decline line (where today's A/D line sits within its range of the last {ADN_DAYS} days, 0–100), smoothed with a {ADN_SMOOTH}-day exponential average. It works as a short/medium-term breadth dashboard with key levels at 20, 50 and 80.",
+        "interpretation": "In the oversold zone (below 20), crossing back above 20 suggests the market is likely to rise in the short term. In the overbought zone (above 80), dropping back below 80 makes a short-term correction likely, and the odds rise if it also crosses 50 downward. An up-impulse is confirmed when it stays above 80 for at least three days; a down-impulse when it closes below 20 even one day. In healthy uptrends it can stay overbought for weeks.",
         "unit": "",
     },
     "summation": {
         "label": "Summation Index & RASI",
         "theory": "The McClellan Summation Index is the running total of the McClellan Oscillator. The ratio-adjusted version (RASI) uses the ratio-adjusted oscillator, so it doesn't depend on how many stocks are counted. Both turn short-term breadth swings into a medium-term trend.",
-        "interpretation": "Rising = breadth is improving, falling = deteriorating; the direction matters more than the level. On RASI, crossing above 0 is a bullish sign, above +500 the market is overbought (often a sign of strong momentum early in a rally), and below −500 it is oversold, where major lows tend to form.",
+        "interpretation": "Rising = breadth is improving, falling = deteriorating; the direction matters more than the level. On RASI, +500 is the bullish threshold and −500 the bearish one: a move above +500 is a long-term buy signal, and a fall below −500 shows broad, sustained weakness. Readings beyond ±1,000 are extreme (overbought / oversold). On the standard Summation Index, a new uptrend is usually considered to start with a thrust from −1,000 to at least +2,000.",
         "unit": "",
     },
     "mcclellan": {
         "label": "McClellan Oscillator",
         "theory": "The difference between a 19-day and a 39-day exponential average (10% and 5% smoothing) of ratio-adjusted net advances. It measures the short-term momentum of breadth, much like MACD does for prices.",
-        "interpretation": "Above zero, advancing stocks dominate; below zero, decliners do. Readings above +70 are overbought and below −70 oversold; beyond ±100 they are extreme. Zero crossings and divergences against the index (e.g. a new index low with a higher oscillator low) are the classic signals.",
+        "interpretation": "Above zero, buyers dominate in the short term; below zero, sellers do. Trading the zero crossings alone gives many false signals; extreme overbought or oversold readings are more useful, as they show a high chance of a turn in the next sessions. A swing from below −50 to above +50 is a breadth thrust. Divergences (the index falling to new lows while the oscillator rises) help spot short-term bottoms, especially combined with an ADn line leaving oversold.",
         "unit": "",
     },
     "new_highs_lows": {
         "label": "New Highs & Lows",
-        "theory": "The number of stocks hitting a new 52-week high (green) and a new 52-week low (red) each day, based on intraday highs and lows. Both are drawn from zero on top of each other, so the larger of the two stands out.",
-        "interpretation": "In a healthy uptrend green clearly dominates. Red expanding while the index is near its highs is a sign of internal weakness. Spikes in new lows come with sell-offs, and their fading tends to signal that the selling is exhausted.",
+        "theory": "The number of stocks making a new 52-week (one-year) high (green) and a new 52-week low (red) each day, based on intraday highs and lows. Both are drawn from zero on top of each other, so the larger of the two stands out.",
+        "interpretation": "New highs outnumbering new lows shows strength; the opposite shows clear weakness and danger. Watch for divergences: new lows rising while the index keeps climbing, or new highs falling while it rises, are warnings (time to tighten stops or hedge). New lows falling after a correction is a good sign. Many investors act when new lows exceed a set share of the market.",
         "unit": "",
     },
     "pct_above_ma": {
         "label": "% Above Moving Averages",
-        "theory": "The percentage of stocks closing above their own 20-day (short term), 50-day (medium term) and 200-day (long term) moving averages.",
-        "interpretation": "Above 50% the majority of stocks are in an uptrend for that time frame. Readings above 80% are overbought and below 20% oversold, especially on the 20- and 50-day lines. When the index rises while these percentages fall, fewer stocks are carrying the move. The 200-day line describes the long-term health of the market.",
+        "theory": "The percentage of stocks closing above their own 20-day (short term), 50-day (medium term) and 200-day (long term) moving averages. The more stocks take part in a move, the more credible it is. Click a line in the legend to show or hide it.",
+        "interpretation": "A market is considered strong with at least 60% of stocks above their 50-day average and weak below 40%. Below 10% is extreme oversold (\u201cblood in the streets\u201d), historically a good time to add exposure. A jump of more than 75 points in under 50 sessions is a first-class breadth thrust that has usually led to gains in the following months (2009, 2011, 2016, 2019, 2020). Divergences against the index are warnings, but can last for weeks.",
         "unit": "%",
     },
     "pct_highs_lows": {
         "label": f"% Within {NEAR_PCT}% of Highs & Lows",
-        "theory": f"The percentage of stocks closing within {NEAR_PCT}% of their 52-week high (green) and within {NEAR_PCT}% of their 52-week low (red). Unlike new highs and lows, which count only the stocks setting a record that very day, this shows how many are close to one.",
-        "interpretation": "Green above 30% means a large share of the market is trading near its highs: a broad, healthy uptrend. When green falls and red rises the market is weakening underneath, and a crossover (red above green) marks a broad downtrend. Green turning up while the index is still falling is an early sign of recovery.",
+        "theory": f"The percentage of stocks closing within {NEAR_PCT}% of their 52-week high (green) and within {NEAR_PCT}% of their 52-week low (red). If the market is healthy, many stocks will be at or near their highs; if not, something is wrong underneath.",
+        "interpretation": "Above 30% of stocks near their highs gives some reassurance about the market; above 40% the market is in a very positive phase. These levels come from all-stock NYSE/Nasdaq data; for the S&P 500 the levels are higher (one study puts the average near 45% when the index returns to highs after a correction). Watch the shape too: the index making higher highs while this line makes lower highs is a lack of strength, stronger if it falls below 30%. More stocks near lows while the market rises is also a danger sign.",
         "unit": "%",
     },
     "volume": {
         "label": "Volume Ratios",
         "theory": "Up volume (shares traded in rising stocks) divided by down volume (shares traded in falling stocks), in blue, and its inverse, down ÷ up volume, in orange. A reading of 2 means twice as much volume went into one side as into the other.",
-        "interpretation": "Peaks above about 4 show one-sided days: heavy, broad buying (blue) or selling (orange). Readings of 9 or more are the classic 90% up / 90% down days. Clusters of orange spikes often precede lows, and a strong blue spike after a decline is a classic sign that buyers are returning.",
+        "interpretation": "Readings above 9 or 10 are rare. A blue spike like that, especially after a fall of 10% or more, marks a day when buyers took control and often starts a medium-term uptrend; several in a few weeks reinforce each other (spring 2009). An orange spike after a fall can be capitulation, with the market exhausted and ready to rebound, ideally confirmed by a strong blue day soon after; at market highs it can warn of exhaustion.",
         "unit": "",
     },
 }
@@ -272,7 +272,7 @@ def build_indicators(dates, counts, index_closes=None, index_name="S&P 500"):
     rasi = [None if f is None else 19 * s_ - 9 * f for f, s_ in zip(fast, slow)]
     summ = [None if f is None else 19 * s_ - 9 * f for f, s_ in zip(raw_fast, raw_slow)]
 
-    adn = sma(stochastic(ad_line, ADN_DAYS), ADN_SMOOTH)
+    adn = ema(stochastic(ad_line, ADN_DAYS), 2 / (ADN_SMOOTH + 1))
 
     nh, nl = cut(counts["nh"]), cut(counts["nl"])
     near_hi, near_lo = cut(counts["near_hi"]), cut(counts["near_lo"])
@@ -325,7 +325,7 @@ def build_indicators(dates, counts, index_closes=None, index_name="S&P 500"):
             "lines": [
                 {"label": "McClellan Oscillator", "type": "bar", "sign_colors": True, "data": _series(d, osc, 1)},
             ],
-            "refs": [0, 70, -70],
+            "refs": [0, 50, -50],
             "latest": last(osc),
             "latest_text": f"{last(osc):+.1f}",
         },
@@ -342,7 +342,7 @@ def build_indicators(dates, counts, index_closes=None, index_name="S&P 500"):
             "lines": [
                 {"label": f"Above {n}-day average", "type": "line", "data": _series(d, pct[n], 1)} for n in MA_SET
             ],
-            "refs": [50, 80, 20],
+            "refs": [{"value": 60, "tone": "up"}, {"value": 50, "tone": "neutral"}, {"value": 40, "tone": "down"}, {"value": 10, "tone": "down"}],
             "range": [0, 100],
             "latest": last(pct[50]),
             "latest_text": " · ".join(f"{n}d {last(pct[n]):.0f}%" for n in MA_SET if last(pct[n]) is not None),
@@ -352,7 +352,7 @@ def build_indicators(dates, counts, index_closes=None, index_name="S&P 500"):
                 {"label": f"Within {NEAR_PCT}% of 52-week high", "type": "line", "color": "up", "data": _series(d, near_hi, 1)},
                 {"label": f"Within {NEAR_PCT}% of 52-week low", "type": "line", "color": "down", "data": _series(d, near_lo, 1)},
             ],
-            "refs": [{"value": 30, "tone": "up"}],
+            "refs": [{"value": 40, "tone": "up"}, {"value": 30, "tone": "up"}],
             "latest": last(near_hi),
             "latest_text": f"{last(near_hi):.0f}%/{last(near_lo):.0f}% (near highs/lows)" if last(near_hi) is not None else "—",
         },
@@ -361,7 +361,7 @@ def build_indicators(dates, counts, index_closes=None, index_name="S&P 500"):
                 {"label": "Up volume ÷ down volume", "type": "area", "color": "blue", "data": _series(d, up_down, 2)},
                 {"label": "Down volume ÷ up volume", "type": "area", "color": "orange", "data": _series(d, down_up, 2)},
             ],
-            "refs": [],
+            "refs": [{"value": 9, "tone": "neutral"}],
             "latest": last(up_down),
             "latest_text": f"{last(up_down):.1f}/{last(down_up):.1f} (up/down)" if last(up_down) is not None and last(down_up) is not None else "—",
         },
